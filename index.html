@@ -1,353 +1,537 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PDF Audio Player</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PDF Audio Player</title>
 
-    <style>
-        /* Hide scrollbar */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-        
-        body {
-            background-color: #000000; /* Main App Background is Black */
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden; 
-            height: 100vh;
-            width: 100vw;
-        }
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-        /* CRITICAL: The "Piece of Paper" Logic */
-        #the-canvas {
-            background-color: #ffffff !important; /* FORCE WHITE BACKGROUND */
-            display: block;
-            margin: 0 auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #121212;
+      color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
 
-        /* GHOST UI: Text Overlay */
-        #text-overlay {
-            background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
-            pointer-events: none; /* Let touches pass through to PDF */
-            text-shadow: 0px 2px 4px rgba(0,0,0,1); /* Strong shadow for readability */
-        }
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
 
-        /* GHOST UI: Controls */
-        #controls-bar {
-            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%);
-        }
+    header {
+      padding: 12px 16px;
+      background: #181818;
+      border-bottom: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
 
-        .icon-badge {
-            font-size: 0.55rem;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            margin-top: 1px;
-            font-weight: 800;
-            color: rgba(255,255,255,0.9);
-        }
-        .btn-wrapper { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
-        
-        /* Glassy Buttons */
-        .glass-btn {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-    </style>
+    header h1 {
+      font-size: 20px;
+      margin: 0;
+    }
+
+    header small {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    .file-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .file-input-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1db954;
+      color: #000;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .file-input-label span.icon {
+      font-size: 18px;
+    }
+
+    .file-input-label input {
+      display: none;
+    }
+
+    .file-name {
+      font-size: 12px;
+      color: #ccc;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 16px 90px;
+    }
+
+    #text-container {
+      font-size: 17px;
+      line-height: 1.6;
+    }
+
+    .sentence {
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+      border-radius: 4px;
+      padding: 1px 2px;
+    }
+
+    .sentence.current {
+      background-color: #1db95433;
+      color: #ffffff;
+    }
+
+    .sentence + .sentence::before {
+      content: " ";
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #999;
+      margin-top: 8px;
+    }
+
+    .player {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #181818;
+      border-top: 1px solid #333;
+      padding: 8px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+    }
+
+    .current-preview {
+      font-size: 13px;
+      color: #ccc;
+      min-height: 1.3em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .controls button {
+      background: #282828;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 12px;
+      font-size: 14px;
+      color: #f5f5f5;
+      cursor: pointer;
+      min-width: 40px;
+    }
+
+    .controls button:active {
+      transform: scale(0.96);
+    }
+
+    #play-pause {
+      background: #1db954;
+      color: #000;
+      font-weight: 600;
+      min-width: 80px;
+    }
+
+    .extra {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .extra label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .extra input[type="range"] {
+      width: 120px;
+    }
+
+    .extra select {
+      background: #282828;
+      color: #f5f5f5;
+      border-radius: 6px;
+      border: 1px solid #333;
+      padding: 3px 6px;
+      font-size: 12px;
+    }
+
+    @media (min-width: 768px) {
+      header h1 {
+        font-size: 22px;
+      }
+      #text-container {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .extra input[type="range"] {
+        width: 160px;
+      }
+    }
+  </style>
 </head>
-<body class="relative h-full w-full">
+<body>
+  <div class="app">
+    <header>
+      <h1>PDF Audio Player</h1>
+      <div class="file-row">
+        <label class="file-input-label">
+          <span class="icon">📄</span>
+          <span>Select PDF</span>
+          <input id="file-input" type="file" accept="application/pdf" />
+        </label>
+        <span class="file-name" id="file-name">No file selected</span>
+      </div>
+      <small>Upload a text-heavy PDF (ebook) and press Play. Tap any sentence to start from there.</small>
+    </header>
 
-    <!-- 1. PDF LAYER (MOVED TO TOP AS REQUESTED) -->
-    <!-- z-index 0: It sits at the bottom of the stack -->
-    <div id="pdf-scroll-container" class="absolute inset-0 w-full h-full overflow-y-auto overflow-x-hidden z-0 flex flex-col items-center bg-[#121212]">
-        
-        <!-- Empty State Message -->
-        <div id="placeholder-msg" class="flex flex-col items-center justify-center h-full opacity-50 mt-[-50px]">
-            <i class="fa-solid fa-book-open text-6xl mb-6 text-gray-600"></i>
-            <p class="text-gray-400 font-light text-lg">Tap the folder to start</p>
-        </div>
-
-        <!-- The PDF Wrapper -->
-        <div id="pdf-wrapper" class="relative hidden w-full pt-[100px] pb-[160px]">
-            <canvas id="the-canvas"></canvas>
-        </div>
-    </div>
-
-    <!-- 2. TEXT OVERLAY (GHOST MODE) -->
-    <div id="text-overlay" class="absolute top-0 left-0 w-full z-30 p-6 pt-14 min-h-[140px] flex flex-col items-center justify-start text-center hidden">
-        <p id="subtitle-text" class="text-white font-medium text-base leading-relaxed max-w-prose opacity-95">
-            ...
+    <main>
+      <div id="text-container">
+        <p class="hint">
+          Load a PDF to see the text here. The current sentence will be highlighted while it is being read,
+          like song lyrics.
         </p>
-        <div class="absolute top-4 right-4 text-[10px] text-gray-400 font-mono">
-            Pg <span id="page-num">0</span>/<span id="page-count">0</span>
-        </div>
+      </div>
+    </main>
+
+    <div class="player">
+      <div id="current-sentence-preview" class="current-preview">
+        No sentence loaded.
+      </div>
+
+      <div class="controls">
+        <button id="back10">⏮ 10</button>
+        <button id="prev">◀ 1</button>
+        <button id="play-pause">Play</button>
+        <button id="next">1 ▶</button>
+        <button id="forward10">10 ⏭</button>
+      </div>
+
+      <div class="extra">
+        <label>
+          Speed
+          <input type="range" id="speed" min="0.7" max="1.4" step="0.1" value="1" />
+        </label>
+        <label>
+          Voice
+          <select id="voice-select"></select>
+        </label>
+      </div>
     </div>
+  </div>
 
-    <!-- 3. FILE OPENER (FLOATING BUTTON) -->
-    <div id="upload-btn-container" class="absolute top-5 left-5 z-50">
-        <input type="file" id="fileInput" accept=".pdf" class="hidden" />
-        <button onclick="document.getElementById('fileInput').click()" 
-                class="bg-black/40 backdrop-blur-md text-white w-10 h-10 rounded-full flex items-center justify-center border border-white/20 shadow-xl hover:bg-black/60 transition">
-            <i class="fa-solid fa-folder-open text-sm"></i>
-        </button>
-    </div>
+  <!-- pdf.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.min.js"></script>
 
-    <!-- 4. LOADING SPINNER -->
-    <div id="loading" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[60]">
-        <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#1DB954] mb-3"></div>
-        <p class="text-white text-xs font-bold uppercase tracking-widest">Processing</p>
-    </div>
+  <script>
+    // ====== PDF + Text handling ======
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.worker.min.js';
 
-    <!-- 5. CONTROLS (TRANSPARENT UI) -->
-    <div id="controls-bar" class="absolute bottom-0 w-full z-40 p-6 pb-10 flex flex-col items-center">
-        
-        <!-- Progress Bar -->
-        <div class="w-full max-w-md bg-white/10 h-1 rounded-full mb-8 cursor-pointer group relative" onclick="seek(event)">
-            <div id="progressBar" class="bg-[#1DB954] h-1 rounded-full w-0 transition-all shadow-[0_0_15px_rgba(29,185,84,0.8)]"></div>
-        </div>
+    const fileInput = document.getElementById('file-input');
+    const fileNameLabel = document.getElementById('file-name');
+    const textContainer = document.getElementById('text-container');
+    const currentPreview = document.getElementById('current-sentence-preview');
 
-        <!-- Buttons -->
-        <div class="flex justify-between items-center px-2 max-w-sm w-full">
-            
-            <button onclick="changeSpeed()" id="speedBtn" class="text-white/50 hover:text-white text-xs font-bold w-10 transition">1x</button>
-            
-            <div class="flex items-center gap-8">
-                <button onclick="skip(-10)" class="text-white/70 hover:text-white relative btn-wrapper transition hover:scale-110">
-                    <i class="fa-solid fa-rotate-left text-2xl"></i>
-                    <span class="icon-badge">10</span>
-                </button>
+    const playPauseBtn = document.getElementById('play-pause');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const back10Btn = document.getElementById('back10');
+    const forward10Btn = document.getElementById('forward10');
+    const speedSlider = document.getElementById('speed');
+    const voiceSelect = document.getElementById('voice-select');
 
-                <button onclick="togglePlay()" id="playBtn" class="glass-btn text-white rounded-full w-16 h-16 flex items-center justify-center hover:bg-white/20 transition active:scale-95 shadow-2xl">
-                    <i class="fa-solid fa-play text-2xl ml-1"></i>
-                </button>
+    const synth = window.speechSynthesis;
+    let voices = [];
+    let sentences = [];
+    let currentIndex = 0;
+    let isPlaying = false;
+    let lastHighlightedSpan = null;
 
-                <button onclick="skip(10)" class="text-white/70 hover:text-white relative btn-wrapper transition hover:scale-110">
-                    <i class="fa-solid fa-rotate-right text-2xl"></i>
-                    <span class="icon-badge">10</span>
-                </button>
-            </div>
+    function splitIntoSentences(text) {
+      // Clean up whitespace
+      const clean = text.replace(/\s+/g, ' ').trim();
+      const regex = /[^\.!\?]+[\.!\?]+/g;
+      const result = [];
+      let match;
 
-            <button onclick="changeVoice()" class="text-white/50 hover:text-white text-lg w-10 transition"><i class="fa-solid fa-robot"></i></button>
-        </div>
-    </div>
+      while ((match = regex.exec(clean)) !== null) {
+        result.push(match[0].trim());
+      }
 
-    <script>
-        // --- LOGIC CORE ---
-        let docData = [];          
-        let currentIndex = 0;      
-        let isPlaying = false;
-        let speechRate = 1.0;
-        let pdfDoc = null;
-        let currentPageNum = 1;
-        
-        let synth = window.speechSynthesis;
-        let currentUtterance = null;
-        let selectedVoice = null;
+      const lastIndex = regex.lastIndex;
+      if (lastIndex < clean.length) {
+        const tail = clean.slice(lastIndex).trim();
+        if (tail) result.push(tail);
+      }
+      return result;
+    }
 
-        // Elements
-        const canvas = document.getElementById('the-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        const fileInput = document.getElementById('fileInput');
-        const playBtnIcon = document.querySelector('#playBtn i');
-        const progressBar = document.getElementById('progressBar');
-        const loading = document.getElementById('loading');
-        const pdfWrapper = document.getElementById('pdf-wrapper');
-        const pageNumSpan = document.getElementById('page-num');
-        const pageCountSpan = document.getElementById('page-count');
-        const textOverlay = document.getElementById('text-overlay');
-        const subtitleText = document.getElementById('subtitle-text');
-        const scrollContainer = document.getElementById('pdf-scroll-container');
+    async function loadPdfFromArrayBuffer(arrayBuffer) {
+      const typedArray = new Uint8Array(arrayBuffer);
+      const pdf = await pdfjsLib.getDocument(typedArray).promise;
 
-        // --- INIT ---
-        window.speechSynthesis.onvoiceschanged = () => {
-            const voices = synth.getVoices();
-            selectedVoice = voices.find(v => v.name.includes("Samantha")) || 
-                            voices.find(v => v.lang.startsWith("en"));
-        };
+      let fullText = '';
 
-        // --- UPLOAD HANDLER ---
-        fileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
 
-            loading.classList.remove('hidden');
-            document.getElementById('placeholder-msg').style.display = 'none';
-            
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
-                
-                pdfWrapper.classList.remove('hidden');
-                textOverlay.classList.remove('hidden');
-                pageCountSpan.innerText = pdfDoc.numPages;
-                
-                docData = [];
-                
-                // Parse Text
-                for (let i = 1; i <= pdfDoc.numPages; i++) {
-                    const page = await pdfDoc.getPage(i);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    const rawSentences = pageText.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g);
-                    
-                    if (rawSentences) {
-                        rawSentences.forEach(s => {
-                            if(s.trim().length > 0) {
-                                docData.push({ text: s.trim(), page: i });
-                            }
-                        });
-                    }
-                }
+      setupSentences(fullText);
+    }
 
-                await renderPage(1);
-                currentIndex = 0;
-                updateUI();
-                loading.classList.add('hidden');
+    function setupSentences(text) {
+      synth.cancel();
+      isPlaying = false;
+      playPauseBtn.textContent = 'Play';
+      sentences = splitIntoSentences(text).filter(s => s.length > 0);
+      currentIndex = 0;
+      renderSentences();
+    }
 
-            } catch (err) {
-                console.error(err);
-                alert("Error reading PDF: " + err.message);
-                loading.classList.add('hidden');
-            }
+    function renderSentences() {
+      textContainer.innerHTML = '';
+      lastHighlightedSpan = null;
+
+      if (!sentences.length) {
+        textContainer.textContent = 'No readable text found in this PDF.';
+        currentPreview.textContent = 'No sentence loaded.';
+        return;
+      }
+
+      sentences.forEach((s, idx) => {
+        const span = document.createElement('span');
+        span.className = 'sentence';
+        span.dataset.index = idx;
+        span.textContent = s + ' ';
+        span.addEventListener('click', () => {
+          currentIndex = idx;
+          speakFromIndex(currentIndex);
         });
+        textContainer.appendChild(span);
+      });
 
-        // --- RENDER ENGINE (Fixed for Black Screen) ---
-        async function renderPage(num) {
-            if(!pdfDoc) return;
-            currentPageNum = num;
-            pageNumSpan.innerText = num;
-            
-            const page = await pdfDoc.getPage(num);
-            
-            // 1. Calculate Fit-Width Scale
-            const containerWidth = window.innerWidth; 
-            const unscaledViewport = page.getViewport({scale: 1});
-            const cssScale = containerWidth / unscaledViewport.width;
-            
-            // 2. Resolution Scale (Safe 1.5x for Mobile Stability)
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            
-            // 3. Create Viewport
-            const renderViewport = page.getViewport({ scale: cssScale * dpr });
+      updatePreview();
+      updateHighlight(false);
+    }
 
-            // 4. Set Canvas Size
-            canvas.width = renderViewport.width;
-            canvas.height = renderViewport.height;
-            
-            // 5. CSS Resizing
-            canvas.style.width = `${renderViewport.width / dpr}px`;
-            canvas.style.height = `${renderViewport.height / dpr}px`;
+    function updatePreview() {
+      if (!sentences.length) {
+        currentPreview.textContent = 'No sentence loaded.';
+        return;
+      }
+      const snippet = sentences[currentIndex] || '';
+      currentPreview.textContent =
+        'Sentence ' + (currentIndex + 1) + '/' + sentences.length + ': ' +
+        snippet.slice(0, 140);
+    }
 
-            // 6. Render
-            const renderContext = {
-                 canvasContext: ctx,
-                 viewport: renderViewport
-            };
-            
-            await page.render(renderContext).promise;
-            scrollContainer.scrollTop = 0;
+    function updateHighlight(scrollIntoView) {
+      if (lastHighlightedSpan) {
+        lastHighlightedSpan.classList.remove('current');
+      }
+      const span = document.querySelector('.sentence[data-index="' + currentIndex + '"]');
+      if (span) {
+        span.classList.add('current');
+        lastHighlightedSpan = span;
+        if (scrollIntoView) {
+          span.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+      }
+    }
 
-        // --- PLAYER LOGIC ---
-        function togglePlay() {
-            if (docData.length === 0) return;
-            if (isPlaying) {
-                synth.cancel();
-                isPlaying = false;
-                playBtnIcon.className = "fa-solid fa-play text-2xl ml-1";
-                document.getElementById('playBtn').classList.remove('shadow-[0_0_20px_rgba(255,255,255,0.4)]');
-            } else {
-                isPlaying = true;
-                playBtnIcon.className = "fa-solid fa-pause text-2xl";
-                document.getElementById('playBtn').classList.add('shadow-[0_0_20px_rgba(255,255,255,0.4)]');
-                speak();
-            }
+    // ====== Voice handling ======
+    function loadVoices() {
+      const allVoices = synth.getVoices();
+      voices = allVoices.filter(v => v.lang.toLowerCase().startsWith('en'));
+      voiceSelect.innerHTML = '';
+
+      if (!voices.length) {
+        const opt = document.createElement('option');
+        opt.value = '-1';
+        opt.textContent = 'System default';
+        voiceSelect.appendChild(opt);
+        return;
+      }
+
+      voices.forEach((v, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = v.name + ' (' + v.lang + ')';
+        voiceSelect.appendChild(opt);
+      });
+    }
+
+    if (typeof speechSynthesis !== 'undefined') {
+      loadVoices();
+      speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    function getSelectedVoice() {
+      const idx = parseInt(voiceSelect.value, 10);
+      if (Number.isNaN(idx) || idx < 0 || idx >= voices.length) return null;
+      return voices[idx];
+    }
+
+    // ====== Text-to-speech playback ======
+    function speakFromIndex(startIndex) {
+      if (!sentences.length) return;
+
+      if (startIndex < 0) startIndex = 0;
+      if (startIndex >= sentences.length) startIndex = sentences.length - 1;
+
+      currentIndex = startIndex;
+      synth.cancel();
+
+      isPlaying = true;
+      playPauseBtn.textContent = 'Pause';
+
+      queueSentence();
+    }
+
+    function queueSentence() {
+      if (!isPlaying) return;
+
+      if (currentIndex < 0 || currentIndex >= sentences.length) {
+        isPlaying = false;
+        playPauseBtn.textContent = 'Play';
+        return;
+      }
+
+      const raw = sentences[currentIndex];
+      const text = raw.trim();
+      if (!text) {
+        currentIndex++;
+        queueSentence();
+        return;
+      }
+
+      updatePreview();
+      updateHighlight(true);
+
+      const utter = new SpeechSynthesisUtterance(text);
+      const voice = getSelectedVoice();
+      if (voice) utter.voice = voice;
+
+      // Speed control
+      utter.rate = parseFloat(speedSlider.value) || 1.0;
+
+      // When one sentence finishes, wait a short time, then speak the next one.
+      utter.onend = function () {
+        if (!isPlaying) return;
+        currentIndex++;
+        setTimeout(queueSentence, 200); // ~200 ms pause between sentences
+      };
+
+      synth.speak(utter);
+    }
+
+    // ====== UI events ======
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      fileNameLabel.textContent = file.name;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        loadPdfFromArrayBuffer(ev.target.result);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    playPauseBtn.addEventListener('click', () => {
+      if (!sentences.length) return;
+
+      if (!isPlaying) {
+        // Start / resume
+        if (synth.paused && synth.speaking) {
+          isPlaying = true;
+          playPauseBtn.textContent = 'Pause';
+          synth.resume();
+        } else {
+          speakFromIndex(currentIndex);
         }
+      } else {
+        // Pause
+        isPlaying = false;
+        playPauseBtn.textContent = 'Play';
+        synth.pause();
+      }
+    });
 
-        function speak() {
-            if (!isPlaying) return;
-            if (currentIndex >= docData.length) {
-                isPlaying = false;
-                playBtnIcon.className = "fa-solid fa-play text-2xl ml-1";
-                return;
-            }
+    prevBtn.addEventListener('click', () => {
+      if (!sentences.length) return;
+      currentIndex = Math.max(0, currentIndex - 1);
+      speakFromIndex(currentIndex);
+    });
 
-            synth.cancel();
-            const item = docData[currentIndex];
-            
-            if (item.page !== currentPageNum) {
-                renderPage(item.page).then(() => { });
-            }
+    nextBtn.addEventListener('click', () => {
+      if (!sentences.length) return;
+      currentIndex = Math.min(sentences.length - 1, currentIndex + 1);
+      speakFromIndex(currentIndex);
+    });
 
-            subtitleText.innerText = item.text;
+    back10Btn.addEventListener('click', () => {
+      if (!sentences.length) return;
+      currentIndex = Math.max(0, currentIndex - 10);
+      speakFromIndex(currentIndex);
+    });
 
-            currentUtterance = new SpeechSynthesisUtterance(item.text);
-            currentUtterance.rate = speechRate;
-            if (selectedVoice) currentUtterance.voice = selectedVoice;
+    forward10Btn.addEventListener('click', () => {
+      if (!sentences.length) return;
+      currentIndex = Math.min(sentences.length - 1, currentIndex + 10);
+      speakFromIndex(currentIndex);
+    });
 
-            currentUtterance.onend = () => {
-                if (isPlaying) {
-                    currentIndex++;
-                    updateUI();
-                    const pause = Math.floor(Math.random() * 400) + 300;
-                    setTimeout(speak, pause);
-                }
-            };
-            
-            currentUtterance.onerror = () => { if(isPlaying) { currentIndex++; speak(); }};
-
-            updateUI();
-            synth.speak(currentUtterance);
-        }
-
-        // --- HELPERS ---
-        function skip(amount) {
-            synth.cancel();
-            currentIndex += amount;
-            if (currentIndex < 0) currentIndex = 0;
-            if (currentIndex >= docData.length) currentIndex = docData.length - 1;
-            if (isPlaying) speak(); else updateUI();
-        }
-
-        function changeSpeed() {
-            const speeds = [1.0, 1.25, 1.5, 2.0];
-            const i = speeds.indexOf(speechRate);
-            speechRate = speeds[(i + 1) % speeds.length];
-            document.getElementById('speedBtn').innerText = speechRate + "x";
-            if (isPlaying) { synth.cancel(); speak(); }
-        }
-
-        function changeVoice() {
-            const voices = synth.getVoices();
-            const enVoices = voices.filter(v => v.lang.startsWith('en'));
-            if(enVoices.length > 0) {
-               const currentIdx = enVoices.indexOf(selectedVoice);
-               selectedVoice = enVoices[(currentIdx + 1) % enVoices.length];
-               alert("Voice: " + selectedVoice.name);
-               if(isPlaying) { synth.cancel(); speak(); }
-            }
-        }
-
-        function updateUI() {
-            const pct = ((currentIndex + 1) / docData.length) * 100;
-            progressBar.style.width = `${pct}%`;
-            
-            if(!isPlaying && docData[currentIndex]) {
-                 subtitleText.innerText = docData[currentIndex].text;
-                 if(docData[currentIndex].page !== currentPageNum) renderPage(docData[currentIndex].page);
-            }
-        }
-    </script>
+    speedSlider.addEventListener('input', () => {
+      // New speed will apply to the next sentences automatically.
+    });
+  </script>
 </body>
 </html>
