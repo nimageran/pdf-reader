@@ -17,7 +17,7 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         
         body {
-            background-color: #000000;
+            background-color: #000000; /* Main App Background is Black */
             color: white;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden; 
@@ -25,32 +25,24 @@
             width: 100vw;
         }
 
-        /* 1. TEXT OVERLAY - SUBTLE & SMALLER */
-        #text-overlay {
-            /* No background color, just a shadow gradient to make white text pop */
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
-            transition: all 0.3s ease;
-            pointer-events: none; /* Touches pass through to PDF */
-            text-shadow: 0px 1px 4px rgba(0,0,0,0.8); /* Stroke effect */
-        }
-
-        /* 2. PLAYER CONTROLS - TRANSPARENT & CLEAN */
-        #controls-bar {
-            /* Gradient from bottom up, so buttons are visible but no hard line */
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%);
-            border-top: none;
-        }
-
-        #pdf-scroll-container {
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* CRITICAL FIX: Force White Background on Canvas so it isn't black-on-black */
+        /* CRITICAL: The "Piece of Paper" Logic */
         #the-canvas {
-            background-color: white; 
+            background-color: #ffffff !important; /* FORCE WHITE BACKGROUND */
             display: block;
             margin: 0 auto;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5); /* Lift it off background */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* GHOST UI: Text Overlay */
+        #text-overlay {
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+            pointer-events: none; /* Let touches pass through to PDF */
+            text-shadow: 0px 2px 4px rgba(0,0,0,1); /* Strong shadow for readability */
+        }
+
+        /* GHOST UI: Controls */
+        #controls-bar {
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%);
         }
 
         .icon-badge {
@@ -61,100 +53,96 @@
             transform: translate(-50%, -50%);
             margin-top: 1px;
             font-weight: 800;
-            color: rgba(255,255,255,0.8);
+            color: rgba(255,255,255,0.9);
         }
         .btn-wrapper { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
         
-        /* Button Styles for Transparency */
+        /* Glassy Buttons */
         .glass-btn {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
     </style>
 </head>
 <body class="relative h-full w-full">
 
-    <!-- 1. TEXT OVERLAY (TOP) -->
-    <div id="text-overlay" class="absolute top-0 left-0 w-full z-30 p-4 pt-10 min-h-[100px] flex flex-col items-center justify-start text-center hidden">
-        <p id="subtitle-text" class="text-white font-medium text-sm md:text-base leading-relaxed max-w-prose opacity-90">
-            Waiting for playback...
+    <!-- 1. PDF LAYER (MOVED TO TOP AS REQUESTED) -->
+    <!-- z-index 0: It sits at the bottom of the stack -->
+    <div id="pdf-scroll-container" class="absolute inset-0 w-full h-full overflow-y-auto overflow-x-hidden z-0 flex flex-col items-center bg-[#121212]">
+        
+        <!-- Empty State Message -->
+        <div id="placeholder-msg" class="flex flex-col items-center justify-center h-full opacity-50 mt-[-50px]">
+            <i class="fa-solid fa-book-open text-6xl mb-6 text-gray-600"></i>
+            <p class="text-gray-400 font-light text-lg">Tap the folder to start</p>
+        </div>
+
+        <!-- The PDF Wrapper -->
+        <div id="pdf-wrapper" class="relative hidden w-full pt-[100px] pb-[160px]">
+            <canvas id="the-canvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 2. TEXT OVERLAY (GHOST MODE) -->
+    <div id="text-overlay" class="absolute top-0 left-0 w-full z-30 p-6 pt-14 min-h-[140px] flex flex-col items-center justify-start text-center hidden">
+        <p id="subtitle-text" class="text-white font-medium text-base leading-relaxed max-w-prose opacity-95">
+            ...
         </p>
-        <div class="absolute top-2 right-4 text-[10px] text-gray-300 font-mono opacity-70">
+        <div class="absolute top-4 right-4 text-[10px] text-gray-400 font-mono">
             Pg <span id="page-num">0</span>/<span id="page-count">0</span>
         </div>
     </div>
 
-    <!-- 2. FILE OPENER -->
-    <div id="upload-btn-container" class="absolute top-4 left-4 z-50">
+    <!-- 3. FILE OPENER (FLOATING BUTTON) -->
+    <div id="upload-btn-container" class="absolute top-5 left-5 z-50">
         <input type="file" id="fileInput" accept=".pdf" class="hidden" />
         <button onclick="document.getElementById('fileInput').click()" 
-                class="bg-black/40 backdrop-blur-md text-white w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-lg">
-            <i class="fa-solid fa-folder-open text-xs"></i>
+                class="bg-black/40 backdrop-blur-md text-white w-10 h-10 rounded-full flex items-center justify-center border border-white/20 shadow-xl hover:bg-black/60 transition">
+            <i class="fa-solid fa-folder-open text-sm"></i>
         </button>
     </div>
 
-    <!-- 3. PDF LAYER -->
-    <div id="pdf-scroll-container" class="absolute inset-0 w-full h-full overflow-y-auto overflow-x-hidden z-0 flex flex-col items-center bg-[#050505]">
-        
-        <div id="placeholder-msg" class="flex flex-col items-center justify-center h-full opacity-40">
-            <i class="fa-solid fa-file-pdf text-5xl mb-6 text-gray-600"></i>
-            <p class="text-gray-500 font-light">Tap folder to open PDF</p>
-        </div>
-
-        <!-- Padding top/bottom ensures we can scroll the very top/bottom of PDF into view -->
-        <div id="pdf-wrapper" class="relative hidden w-full pt-[80px] pb-[140px]">
-            <canvas id="the-canvas"></canvas>
-        </div>
-    </div>
-    
-    <!-- Loading Spinner -->
+    <!-- 4. LOADING SPINNER -->
     <div id="loading" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[60]">
         <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#1DB954] mb-3"></div>
-        <p class="text-white text-sm font-bold animate-pulse">Rendering High Quality...</p>
+        <p class="text-white text-xs font-bold uppercase tracking-widest">Processing</p>
     </div>
 
-    <!-- 4. CONTROLS (BOTTOM) -->
-    <div id="controls-bar" class="absolute bottom-0 w-full z-40 p-4 pb-8 flex flex-col items-center">
+    <!-- 5. CONTROLS (TRANSPARENT UI) -->
+    <div id="controls-bar" class="absolute bottom-0 w-full z-40 p-6 pb-10 flex flex-col items-center">
         
-        <!-- Progress Bar (Thin & Sleek) -->
-        <div class="w-full max-w-md bg-white/20 h-1 rounded-full mb-6 cursor-pointer group relative" onclick="seek(event)">
-            <div id="progressBar" class="bg-[#1DB954] h-1 rounded-full w-0 transition-all shadow-[0_0_10px_rgba(29,185,84,0.6)]"></div>
+        <!-- Progress Bar -->
+        <div class="w-full max-w-md bg-white/10 h-1 rounded-full mb-8 cursor-pointer group relative" onclick="seek(event)">
+            <div id="progressBar" class="bg-[#1DB954] h-1 rounded-full w-0 transition-all shadow-[0_0_15px_rgba(29,185,84,0.8)]"></div>
         </div>
 
-        <!-- Buttons Grid -->
-        <div class="flex justify-between items-center px-4 max-w-sm w-full">
+        <!-- Buttons -->
+        <div class="flex justify-between items-center px-2 max-w-sm w-full">
             
-            <!-- Speed (Small Text) -->
-            <button onclick="changeSpeed()" id="speedBtn" class="text-white/60 hover:text-white text-xs font-bold w-10">1x</button>
+            <button onclick="changeSpeed()" id="speedBtn" class="text-white/50 hover:text-white text-xs font-bold w-10 transition">1x</button>
             
-            <!-- Main Controls -->
-            <div class="flex items-center gap-6">
-                <!-- Back 10s -->
-                <button onclick="skip(-10)" class="text-white/80 hover:text-white relative btn-wrapper hover:scale-105 transition">
+            <div class="flex items-center gap-8">
+                <button onclick="skip(-10)" class="text-white/70 hover:text-white relative btn-wrapper transition hover:scale-110">
                     <i class="fa-solid fa-rotate-left text-2xl"></i>
                     <span class="icon-badge">10</span>
                 </button>
 
-                <!-- Play Button (Glassy Circle) -->
-                <button onclick="togglePlay()" id="playBtn" class="glass-btn text-white rounded-full w-16 h-16 flex items-center justify-center hover:bg-white/20 transition active:scale-95 shadow-2xl backdrop-blur-md">
+                <button onclick="togglePlay()" id="playBtn" class="glass-btn text-white rounded-full w-16 h-16 flex items-center justify-center hover:bg-white/20 transition active:scale-95 shadow-2xl">
                     <i class="fa-solid fa-play text-2xl ml-1"></i>
                 </button>
 
-                <!-- Forward 10s -->
-                <button onclick="skip(10)" class="text-white/80 hover:text-white relative btn-wrapper hover:scale-105 transition">
+                <button onclick="skip(10)" class="text-white/70 hover:text-white relative btn-wrapper transition hover:scale-110">
                     <i class="fa-solid fa-rotate-right text-2xl"></i>
                     <span class="icon-badge">10</span>
                 </button>
             </div>
 
-            <!-- Voice (Small Icon) -->
-            <button onclick="changeVoice()" class="text-white/60 hover:text-white text-lg w-10"><i class="fa-solid fa-robot"></i></button>
+            <button onclick="changeVoice()" class="text-white/50 hover:text-white text-lg w-10 transition"><i class="fa-solid fa-robot"></i></button>
         </div>
     </div>
 
     <script>
-        // --- DATA ---
+        // --- LOGIC CORE ---
         let docData = [];          
         let currentIndex = 0;      
         let isPlaying = false;
@@ -181,14 +169,14 @@
         const subtitleText = document.getElementById('subtitle-text');
         const scrollContainer = document.getElementById('pdf-scroll-container');
 
-        // --- SETUP ---
+        // --- INIT ---
         window.speechSynthesis.onvoiceschanged = () => {
             const voices = synth.getVoices();
             selectedVoice = voices.find(v => v.name.includes("Samantha")) || 
                             voices.find(v => v.lang.startsWith("en"));
         };
 
-        // --- FILE LOADING ---
+        // --- UPLOAD HANDLER ---
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -206,6 +194,7 @@
                 
                 docData = [];
                 
+                // Parse Text
                 for (let i = 1; i <= pdfDoc.numPages; i++) {
                     const page = await pdfDoc.getPage(i);
                     const textContent = await page.getTextContent();
@@ -228,12 +217,12 @@
 
             } catch (err) {
                 console.error(err);
-                alert("Error: " + err.message);
+                alert("Error reading PDF: " + err.message);
                 loading.classList.add('hidden');
             }
         });
 
-        // --- HIGH RES RENDERING ---
+        // --- RENDER ENGINE (Fixed for Black Screen) ---
         async function renderPage(num) {
             if(!pdfDoc) return;
             currentPageNum = num;
@@ -241,24 +230,26 @@
             
             const page = await pdfDoc.getPage(num);
             
-            // 1. CSS Scale (Fit Width)
+            // 1. Calculate Fit-Width Scale
             const containerWidth = window.innerWidth; 
             const unscaledViewport = page.getViewport({scale: 1});
             const cssScale = containerWidth / unscaledViewport.width;
             
-            // 2. Device Pixel Ratio (Safe 2x cap)
+            // 2. Resolution Scale (Safe 1.5x for Mobile Stability)
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             
-            // 3. Render Viewport
+            // 3. Create Viewport
             const renderViewport = page.getViewport({ scale: cssScale * dpr });
 
+            // 4. Set Canvas Size
             canvas.width = renderViewport.width;
             canvas.height = renderViewport.height;
-
-            // 4. CSS Squash
+            
+            // 5. CSS Resizing
             canvas.style.width = `${renderViewport.width / dpr}px`;
             canvas.style.height = `${renderViewport.height / dpr}px`;
 
+            // 6. Render
             const renderContext = {
                  canvasContext: ctx,
                  viewport: renderViewport
@@ -268,20 +259,18 @@
             scrollContainer.scrollTop = 0;
         }
 
-        // --- AUDIO ---
+        // --- PLAYER LOGIC ---
         function togglePlay() {
             if (docData.length === 0) return;
             if (isPlaying) {
                 synth.cancel();
                 isPlaying = false;
                 playBtnIcon.className = "fa-solid fa-play text-2xl ml-1";
-                // Reset button glow
-                document.getElementById('playBtn').classList.remove('bg-white/20');
+                document.getElementById('playBtn').classList.remove('shadow-[0_0_20px_rgba(255,255,255,0.4)]');
             } else {
                 isPlaying = true;
                 playBtnIcon.className = "fa-solid fa-pause text-2xl";
-                // Add active glow
-                document.getElementById('playBtn').classList.add('bg-white/20');
+                document.getElementById('playBtn').classList.add('shadow-[0_0_20px_rgba(255,255,255,0.4)]');
                 speak();
             }
         }
@@ -322,7 +311,7 @@
             synth.speak(currentUtterance);
         }
 
-        // --- CONTROLS ---
+        // --- HELPERS ---
         function skip(amount) {
             synth.cancel();
             currentIndex += amount;
