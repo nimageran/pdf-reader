@@ -443,6 +443,18 @@
         updateProgress();
     }
 
+    function calculatePauseTime(sentence) {
+        // Count different punctuation marks
+        const periods = (sentence.match(/\./g) || []).length;
+        const commas = (sentence.match(/,/g) || []).length;
+        const exclamationQuestions = (sentence.match(/[!?]/g) || []).length;
+        
+        // Calculate total pause time (in milliseconds)
+        const pauseTime = (periods * 700) + (commas * 300) + (exclamationQuestions * 500);
+        
+        return pauseTime;
+    }
+
     function speakSentence(index) {
         if (index >= sentences.length) {
             isPlaying = false;
@@ -455,12 +467,10 @@
 
         speechSynthesis.cancel();
         
-        let textToSpeak = sentences[index];
-        textToSpeak = textToSpeak.replace(/,/g, ',<break time="300ms"/>');
-        textToSpeak = textToSpeak.replace(/\./g, '.<break time="700ms"/>');
-        textToSpeak = textToSpeak.replace(/[!?]/g, (match) => `${match}<break time="500ms"/>`);
+        const currentSentence = sentences[index];
+        const pauseTime = calculatePauseTime(currentSentence);
 
-        utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance = new SpeechSynthesisUtterance(currentSentence);
         utterance.rate = playbackSpeed;
         if (selectedVoice) {
             utterance.voice = selectedVoice;
@@ -468,9 +478,10 @@
 
         utterance.onend = () => {
             if (isPlaying) {
+                // Add natural pause after sentence based on punctuation
                 setTimeout(() => {
                     speakSentence(index + 1);
-                }, 700);
+                }, pauseTime);
             }
         };
 
