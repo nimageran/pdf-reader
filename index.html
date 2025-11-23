@@ -13,29 +13,41 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        /* Hide scrollbar but allow functionality */
+        /* Hide scrollbar */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         
         body {
             background-color: #000000;
-            color: #b3b3b3;
+            color: white;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden; 
             height: 100vh;
             width: 100vw;
         }
 
-        /* The HUD Subtitle Box */
-        #subtitle-overlay {
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        /* GLASSMORPHISM TEXT OVERLAY */
+        #text-overlay {
+            background: rgba(0, 0, 0, 0.6); /* See-through black */
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             transition: all 0.3s ease;
+            pointer-events: none; /* Let touches pass through to PDF */
         }
 
-        /* Tiny badge for the 10s icons */
+        /* GLASSMORPHISM CONTROLS */
+        #controls-bar {
+            background: rgba(18, 18, 18, 0.85); /* Slightly more opaque for buttons */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* The PDF Container */
+        #pdf-scroll-container {
+            -webkit-overflow-scrolling: touch; /* Smooth momentum scrolling on iOS */
+        }
+
         .icon-badge {
             font-size: 0.6rem;
             position: absolute;
@@ -49,86 +61,80 @@
         .btn-wrapper { position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
-<body class="flex flex-col h-full w-full">
+<body class="relative h-full w-full">
 
-    <!-- TOP BAR -->
-    <div class="h-12 bg-[#121212] flex items-center justify-between px-4 border-b border-[#282828] shrink-0 z-50">
-        <h1 class="text-white font-bold text-sm truncate max-w-[50%]">PDF Player</h1>
-        <div class="flex items-center gap-2">
-            <span class="text-[10px] text-gray-500">Pg <span id="page-num">0</span>/<span id="page-count">0</span></span>
-            <input type="file" id="fileInput" accept=".pdf" class="hidden" />
-            <button onclick="document.getElementById('fileInput').click()" 
-                    class="text-xs bg-[#282828] text-white px-3 py-1.5 rounded-full font-bold hover:bg-[#3E3E3E]">
-                <i class="fa-solid fa-folder-open mr-1"></i>
-            </button>
+    <!-- 1. TEXT OVERLAY (TOP) - Floating on top of PDF -->
+    <div id="text-overlay" class="absolute top-0 left-0 w-full z-30 p-4 pt-12 min-h-[120px] flex flex-col items-center justify-center text-center hidden">
+        <p id="subtitle-text" class="text-white font-semibold text-lg md:text-xl leading-relaxed drop-shadow-md max-w-prose">
+            Waiting for playback...
+        </p>
+        <!-- Page Indicator (Small) -->
+        <div class="absolute top-2 right-4 text-[10px] text-gray-300 font-mono opacity-70">
+            Pg <span id="page-num">0</span>/<span id="page-count">0</span>
         </div>
     </div>
 
-    <!-- MAIN FULL SCREEN VIEW -->
-    <div class="flex-1 relative overflow-hidden bg-[#181818]">
-        
-        <!-- THE HUD (Subtitle Overlay) - Top of screen -->
-        <div id="subtitle-overlay" class="absolute top-0 left-0 w-full z-40 p-4 min-h-[80px] flex items-center justify-center hidden">
-            <p id="subtitle-text" class="text-white text-center font-medium text-lg md:text-xl leading-snug drop-shadow-md">
-                Waiting for playback...
-            </p>
-        </div>
-
-        <!-- PDF CONTAINER (Scrollable) -->
-        <div id="pdf-scroll-container" class="w-full h-full overflow-y-auto overflow-x-hidden flex flex-col items-center pt-[100px] pb-[10px]">
-            <!-- Placeholder -->
-            <div id="placeholder-msg" class="flex flex-col items-center justify-center h-full opacity-50 mt-20">
-                <i class="fa-solid fa-file-pdf text-4xl mb-4"></i>
-                <p>Open PDF to View</p>
-            </div>
-
-            <!-- Canvas Wrapper -->
-            <div id="pdf-wrapper" class="relative shadow-2xl hidden">
-                <canvas id="the-canvas" class="block"></canvas>
-            </div>
-        </div>
-        
-        <!-- Loading Overlay -->
-        <div id="loading" class="hidden absolute inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-50">
-            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#1DB954] mb-3"></div>
-            <p class="text-white text-sm font-bold animate-pulse">Processing PDF...</p>
-        </div>
+    <!-- 2. FILE OPENER (Floating Button) -->
+    <div id="upload-btn-container" class="absolute top-4 left-4 z-50">
+        <input type="file" id="fileInput" accept=".pdf" class="hidden" />
+        <button onclick="document.getElementById('fileInput').click()" 
+                class="bg-black/50 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
+            <i class="fa-solid fa-folder-open text-xs"></i>
+        </button>
     </div>
 
-    <!-- CONTROLS -->
-    <div class="h-auto bg-[#121212] border-t border-[#282828] p-4 pb-8 shrink-0 z-50">
+    <!-- 3. PDF LAYER (BACKGROUND) -->
+    <div id="pdf-scroll-container" class="absolute inset-0 w-full h-full overflow-y-auto overflow-x-hidden z-0 flex flex-col items-center bg-[#121212]">
+        
+        <!-- Placeholder -->
+        <div id="placeholder-msg" class="flex flex-col items-center justify-center h-full opacity-40">
+            <i class="fa-solid fa-file-pdf text-5xl mb-6"></i>
+            <p>Open a PDF</p>
+        </div>
+
+        <!-- Canvas Wrapper (Padding added to top/bottom so content isn't hidden by bars) -->
+        <div id="pdf-wrapper" class="relative shadow-2xl hidden w-full pt-[130px] pb-[160px]">
+            <canvas id="the-canvas" class="block mx-auto"></canvas>
+        </div>
+    </div>
+    
+    <!-- Loading Spinner -->
+    <div id="loading" class="hidden absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-[60]">
+        <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#1DB954] mb-3"></div>
+        <p class="text-white text-sm font-bold animate-pulse">Rendering High Quality...</p>
+    </div>
+
+    <!-- 4. CONTROLS (BOTTOM) -->
+    <div id="controls-bar" class="absolute bottom-0 w-full z-40 p-4 pb-8">
         <!-- Progress Bar -->
-        <div class="w-full bg-[#404040] h-1 rounded-full mb-5 cursor-pointer group" onclick="seek(event)">
-            <div id="progressBar" class="bg-[#b3b3b3] h-1 rounded-full w-0 group-hover:bg-[#1DB954] transition-all"></div>
+        <div class="w-full bg-gray-600 h-1 rounded-full mb-5 cursor-pointer group relative" onclick="seek(event)">
+            <div id="progressBar" class="bg-white h-1 rounded-full w-0 group-hover:bg-[#1DB954] transition-all shadow-[0_0_10px_rgba(29,185,84,0.5)]"></div>
         </div>
 
         <!-- Buttons Grid -->
         <div class="flex justify-between items-center px-0 md:px-4 max-w-lg mx-auto w-full">
             <!-- Speed -->
-            <button onclick="changeSpeed()" id="speedBtn" class="text-[#b3b3b3] text-xs font-bold w-8">1x</button>
+            <button onclick="changeSpeed()" id="speedBtn" class="text-gray-400 hover:text-white text-xs font-bold w-8">1x</button>
             
-            <!-- Main Controls Group -->
+            <!-- Main Controls -->
             <div class="flex items-center gap-4 md:gap-8">
-                <!-- Back 10 -->
-                <button onclick="skip(-10)" class="text-[#b3b3b3] hover:text-white relative btn-wrapper">
+                <button onclick="skip(-10)" class="text-gray-400 hover:text-white relative btn-wrapper">
                     <i class="fa-solid fa-rotate-left text-xl"></i>
                     <span class="icon-badge">10</span>
                 </button>
 
-                <!-- Play -->
-                <button onclick="togglePlay()" id="playBtn" class="bg-white text-black rounded-full w-14 h-14 flex items-center justify-center hover:scale-105 transition active:scale-95 shadow-lg mx-2">
+                <button onclick="togglePlay()" id="playBtn" class="bg-white text-black rounded-full w-14 h-14 flex items-center justify-center hover:scale-110 transition active:scale-95 shadow-xl mx-2">
                     <i class="fa-solid fa-play text-xl ml-1"></i>
                 </button>
 
-                <!-- Forward 10 -->
-                <button onclick="skip(10)" class="text-[#b3b3b3] hover:text-white relative btn-wrapper">
+                <button onclick="skip(10)" class="text-gray-400 hover:text-white relative btn-wrapper">
                     <i class="fa-solid fa-rotate-right text-xl"></i>
                     <span class="icon-badge">10</span>
                 </button>
             </div>
 
             <!-- Voice -->
-            <button onclick="changeVoice()" class="text-[#b3b3b3] text-lg w-8"><i class="fa-solid fa-robot"></i></button>
+            <button onclick="changeVoice()" class="text-gray-400 hover:text-white text-lg w-8"><i class="fa-solid fa-robot"></i></button>
         </div>
     </div>
 
@@ -156,7 +162,7 @@
         const pdfWrapper = document.getElementById('pdf-wrapper');
         const pageNumSpan = document.getElementById('page-num');
         const pageCountSpan = document.getElementById('page-count');
-        const subtitleOverlay = document.getElementById('subtitle-overlay');
+        const textOverlay = document.getElementById('text-overlay');
         const subtitleText = document.getElementById('subtitle-text');
         const scrollContainer = document.getElementById('pdf-scroll-container');
 
@@ -180,7 +186,7 @@
                 pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
                 
                 pdfWrapper.classList.remove('hidden');
-                subtitleOverlay.classList.remove('hidden');
+                textOverlay.classList.remove('hidden');
                 pageCountSpan.innerText = pdfDoc.numPages;
                 
                 docData = [];
@@ -190,23 +196,19 @@
                     const page = await pdfDoc.getPage(i);
                     const textContent = await page.getTextContent();
                     const pageText = textContent.items.map(item => item.str).join(' ');
-                    
-                    // Simple Regex Split
                     const rawSentences = pageText.match(/[^.!?]+[.!?]+["']?|[^.!?]+$/g);
                     
                     if (rawSentences) {
                         rawSentences.forEach(s => {
                             if(s.trim().length > 0) {
-                                docData.push({
-                                    text: s.trim(),
-                                    page: i
-                                });
+                                docData.push({ text: s.trim(), page: i });
                             }
                         });
                     }
                 }
 
-                renderPage(1);
+                // Initial Render
+                await renderPage(1);
                 currentIndex = 0;
                 updateUI();
                 loading.classList.add('hidden');
@@ -218,7 +220,7 @@
             }
         });
 
-        // --- 3. RENDERING (Full Width) ---
+        // --- 3. HIGH QUALITY RENDERING (RETINA SUPPORT) ---
         async function renderPage(num) {
             if(!pdfDoc) return;
             currentPageNum = num;
@@ -226,24 +228,48 @@
             
             const page = await pdfDoc.getPage(num);
             
-            // FIT TO WIDTH LOGIC
-            // 1. Get container width (the screen width basically)
-            const containerWidth = scrollContainer.clientWidth - 20; // minus padding
+            // 1. Get Screen Width
+            const containerWidth = window.innerWidth; 
             
-            // 2. Get viewport at scale 1
+            // 2. Get Base Viewport (Scale 1.0)
             const unscaledViewport = page.getViewport({scale: 1});
             
-            // 3. Calculate scale to fill width
-            const scale = containerWidth / unscaledViewport.width;
-            const viewport = page.getViewport({scale: scale});
-
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-
-            const renderContext = { canvasContext: ctx, viewport: viewport };
-            await page.render(renderContext).promise;
+            // 3. Calculate "CSS Scale" (How big it should look on screen)
+            // We subtract nothing or very little to ensure full width
+            const cssScale = containerWidth / unscaledViewport.width;
             
-            // Scroll to top of new page
+            // 4. Get Device Pixel Ratio (e.g., 3 for iPhone 13 Pro)
+            // This is the key to sharpness. We multiply our target size by the pixel density.
+            const dpr = window.devicePixelRatio || 1;
+            
+            // 5. Get the "Render Viewport" (The giant high-res version)
+            const renderViewport = page.getViewport({ scale: cssScale * dpr });
+
+            // 6. Set Canvas Dimensions to the High-Res size
+            canvas.width = renderViewport.width;
+            canvas.height = renderViewport.height;
+
+            // 7. Use CSS to squash it back down to screen size
+            canvas.style.width = `${renderViewport.width / dpr}px`;
+            canvas.style.height = `${renderViewport.height / dpr}px`;
+
+            // 8. Render
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: renderViewport,
+                transform: [dpr, 0, 0, dpr, 0, 0] // Optional transform if needed, but viewport scaling usually handles it
+            };
+            
+            // Note: With viewport scaling, we usually don't need transform, 
+            // but let's stick to standard render.
+            const renderContextSimple = {
+                 canvasContext: ctx,
+                 viewport: renderViewport
+            };
+            
+            await page.render(renderContextSimple).promise;
+            
+            // Reset Scroll to top
             scrollContainer.scrollTop = 0;
         }
 
@@ -254,11 +280,11 @@
                 synth.cancel();
                 isPlaying = false;
                 playBtnIcon.className = "fa-solid fa-play text-xl ml-1";
-                subtitleOverlay.style.borderBottomColor = "rgba(255, 255, 255, 0.1)";
+                textOverlay.style.borderColor = "rgba(255, 255, 255, 0.1)";
             } else {
                 isPlaying = true;
                 playBtnIcon.className = "fa-solid fa-pause text-xl";
-                subtitleOverlay.style.borderBottomColor = "#1DB954"; // Green glow when active
+                textOverlay.style.borderColor = "#1DB954"; // Green glow
                 speak();
             }
         }
@@ -276,7 +302,10 @@
             
             // Auto Page Turn
             if (item.page !== currentPageNum) {
-                renderPage(item.page);
+                // We need to pause briefly to render the new page
+                renderPage(item.page).then(() => {
+                     // Continue speaking after render
+                });
             }
 
             // Update HUD Text
