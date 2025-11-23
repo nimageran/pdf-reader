@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDF Audio Player</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        
+        /* The Active Sentence in the Lyrics View */
+        .active-sentence {
+            color: #1DB954; /* Spotify Green */
+            font-weight: 700;
+            border-left: 4px solid #1DB954;
+            padding-left: 10px;
+            background: linear-gradient(90deg, rgba(29,185,84,0.1) 0%, rgba(0,0,0,0) 100%);
+        }
+
+        body {
+            background-color: #000000;
+            color: #b3b3b3;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; 
+        }
+        
+        /* Tiny badge for the 10s icons */
+        .icon-badge {
+            font-size: 0.6rem;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin-top: 1px;
+            font-weight: 800;
+            color: #b3b3b3;
+        }
+        .btn-wrapper { position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- TOP BAR -->
+    <div class="h-14 bg-[#121212] flex items-center justify-between px-4 border-b border-[#282828] shrink-0">
+        <h1 class="text-white font-bold text-sm truncate max-w-[50%]">PDF Player</h1>
+        <div>
+            <input type="file" id="fileInput" accept=".pdf" class="hidden" />
+            <button onclick="document.getElementById('fileInput').click()" 
+                    class="text-xs bg-[#282828] text-white px-3 py-1.5 rounded-full font-bold hover:bg-[#3E3E3E]">
+                <i class="fa-solid fa-folder-open mr-1"></i> Open
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN SPLIT VIEW -->
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+        
+        <!-- TOP HALF: PDF VIEWER (Canvas) -->
+        <div id="pdf-container" class="h-[45%] bg-[#181818] flex items-center justify-center p-2 relative overflow-hidden hidden">
+            <!-- Wrapper for Positioning Canvas + Highlights -->
+            <div id="pdf-wrapper" class="relative h-full flex items-center justify-center">
+                <!-- Layer 1: The PDF Image -->
+                <canvas id="the-canvas" class="max-h-full max-w-full shadow-lg border border-[#333] z-10"></canvas>
+                <!-- Layer 2: The Highlight Overlay (Must match size exactly) -->
+                <canvas id="highlight-canvas" class="absolute top-0 left-0 z-20 pointer-events-none"></canvas>
+            </div>
+            
+            <!-- Page Number Badge -->
+            <div class="absolute top-4 right-4 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded z-30">
+                Pg <span id="page-num">0</span> / <span id="page-count">0</span>
+            </div>
+        </div>
+
+        <!-- BOTTOM HALF: LYRICS (Scrolling Text) -->
+        <div id="lyrics-container" class="flex-1 bg-[#121212] overflow-y-auto p-6 pb-32 text-lg leading-relaxed text-[#b3b3b3] text-center">
+            <div id="placeholder-msg" class="flex flex-col items-center justify-center h-full opacity-50">
+                <i class="fa-solid fa-headphones text-4xl mb-4"></i>
+                <p>Upload a PDF to begin</p>
+            </div>
+            <div id="sentences-list" class="flex flex-col gap-4"></div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div id="loading" class="hidden absolute inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-50">
+            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#1DB954] mb-3"></div>
+            <p class="text-white text-sm font-bold animate-pulse">Processing & Mapping...</p>
+        </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="h-auto bg-[#181818] border-t border-[#282828] p-4 shrink-0 z-40 pb-safe">
+        <!-- Progress Bar -->
+        <div class="w-full bg-[#404040] h-1 rounded-full mb-5 cursor-pointer group" onclick="seek(event)">
+            <div id="progressBar" class="bg-[#b3b3b3] h-1 rounded-full w-0 group-hover:bg-[#1DB954] transition-all"></div>
+        </div>
+
+        <!-- Buttons Grid -->
+        <div class="flex justify-between items-center px-0 md:px-4">
+            <!-- Speed -->
+            <button onclick="changeSpeed()" id="speedBtn" class="text-[#b3b3b3] text-xs font-bold w-8">1x</button>
+            
+            <!-- Main Controls Group -->
+            <div class="flex items-center gap-3 md:gap-6">
+                <!-- Back 10 -->
+                <button onclick="skip(-10)" class="text-[#b3b3b3] hover:text-white relative btn-wrapper">
+                    <i class="fa-solid fa-rotate-left text-xl"></i>
+                    <span class="icon-badge">10</span>
+                </button>
+
+                <!-- Prev Track -->
+                <button onclick="prevSentence()" class="text-white hover:text-[#1DB954] text-xl hidden md:block">
+                    <i class="fa-solid fa-backward-step"></i>
+                </button>
+                
+                <!-- Play -->
+                <button onclick="togglePlay()" id="playBtn" class="bg-white text-black rounded-full w-12 h-12 flex items-center justify-center hover:scale-105 transition active:scale-95 shadow-lg mx-2">
+                    <i class="fa-solid fa-play text-lg ml-1"></i>
+                </button>
+                
+                <!-- Next Track -->
+                <button onclick="nextSentence()" class="text-white hover:text-[#1DB954] text-xl hidden md:block">
+                    <i class="fa-solid fa-forward-step"></i>
+                </button>
+
+                <!-- Forward 10 -->
+                <button onclick="skip(10)" class="text-[#b3b3b3] hover:text-white relative btn-wrapper">
+                    <i class="fa-solid fa-rotate-right text-xl"></i>
+                    <span class="icon-badge">10</span>
+                </button>
+            </div>
+
+            <!-- Voice -->
+            <button onclick="changeVoice()" class="text-[#b3b3b3] text-lg w-8"><i class="fa-solid fa-robot"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STRUCTURES ---
+        // Enhanced DocData: Includes 'items' (coordinate data) for each sentence
+        let docData = [];          
+        let currentIndex = 0;      
+        let isPlaying = false;
+        let speechRate = 1.0;
+        let pdfDoc = null;
+        let currentPageNum = 1;
+        let currentViewport = null; // Store viewport for coordinate calc
+        
+        let synth = window.speechSynthesis;
+        let currentUtterance = null;
+        let selectedVoice = null;
+
+        // Elements
+        const canvas = document.getElementById('the-canvas');
+        const ctx = canvas.getContext('2d');
+        const hCanvas = document.getElementById('highlight-canvas');
+        const hCtx = hCanvas.getContext('2d');
+        
+        const fileInput = document.getElementById('fileInput');
+        const playBtnIcon = document.querySelector('#playBtn i');
+        const progressBar = document.getElementById('progressBar');
+        const loading = document.getElementById('loading');
+        const sentencesList = document.getElementById('sentences-list');
+        const pdfContainer = document.getElementById('pdf-container');
+        const pageNumSpan = document.getElementById('page-num');
+        const pageCountSpan = document.getElementById('page-count');
+
+        // --- 1. SETUP ---
+        window.speechSynthesis.onvoiceschanged = () => {
+            const voices = synth.getVoices();
+            selectedVoice = voices.find(v => v.name.includes("Samantha")) || 
+                            voices.find(v => v.lang.startsWith("en"));
+        };
+
+        // --- 2. FILE PROCESSING (The Smart Parser) ---
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            loading.classList.remove('hidden');
+            document.getElementById('placeholder-msg').style.display = 'none';
+            sentencesList.innerHTML = '';
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                pdfContainer.classList.remove('hidden');
+                pageCountSpan.innerText = pdfDoc.numPages;
+                
+                docData = [];
+                
+                // Advanced loop to capture Coordinates
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    const page = await pdfDoc.getPage(i);
+                    const textContent = await page.getTextContent();
+                    
+                    // Grouping Logic: 
+                    // We iterate items. We build a sentence. We keep the items associated with that sentence.
+                    let currentSentenceStr = "";
+                    let currentSentenceItems = [];
+                    
+                    textContent.items.forEach(item => {
+                        const str = item.str;
+                        // Skip empty whitespace items that mess up highlighting
+                        if (!str.trim()) return; 
+                        
+                        currentSentenceStr += str + " ";
+                        currentSentenceItems.push(item);
+                        
+                        // Check if end of sentence
+                        if (/[.!?]$/.test(str.trim())) {
+                            // Push to master data
+                            docData.push({
+                                text: currentSentenceStr.trim(),
+                                page: i,
+                                items: [...currentSentenceItems] // Clone array
+                            });
+                            // Reset
+                            currentSentenceStr = "";
+                            currentSentenceItems = [];
+                        }
+                    });
+
+                    // Catch any leftovers on the page
+                    if (currentSentenceStr.trim().length > 0) {
+                        docData.push({
+                            text: currentSentenceStr.trim(),
+                            page: i,
+                            items: [...currentSentenceItems]
+                        });
+                    }
+                }
+
+                renderLyrics();
+                renderPage(1);
+                currentIndex = 0;
+                updateUI();
+                loading.classList.add('hidden');
+
+            } catch (err) {
+                console.error(err);
+                alert("Error processing PDF: " + err.message);
+                loading.classList.add('hidden');
+            }
+        });
+
+        // --- 3. RENDERING (Dual Layer) ---
+        async function renderPage(num) {
+            if(!pdfDoc) return;
+            currentPageNum = num;
+            pageNumSpan.innerText = num;
+            
+            const page = await pdfDoc.getPage(num);
+            const containerHeight = document.getElementById('pdf-wrapper').clientHeight;
+            
+            // 1. Calculate Scale
+            const unscaledViewport = page.getViewport({scale: 1});
+            const scale = containerHeight / unscaledViewport.height;
+            const viewport = page.getViewport({scale: scale});
+            currentViewport = viewport; // Save for highlight math
+
+            // 2. Resize BOTH Canvases
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            hCanvas.height = viewport.height;
+            hCanvas.width = viewport.width;
+
+            // 3. Render PDF to Bottom Layer
+            const renderContext = { canvasContext: ctx, viewport: viewport };
+            await page.render(renderContext).promise;
+            
+            // 4. Trigger Highlight Redraw (since we wiped the canvas)
+            drawHighlights();
+        }
+
+        // --- 4. HIGHLIGHT LOGIC ---
+        function drawHighlights() {
+            // Clear previous highlights
+            hCtx.clearRect(0, 0, hCanvas.width, hCanvas.height);
+            
+            const currentSentence = docData[currentIndex];
+            if (!currentSentence) return;
+
+            // Only highlight if the sentence is on the CURRENT viewing page
+            if (currentSentence.page !== currentPageNum) return;
+
+            hCtx.fillStyle = 'rgba(29, 185, 84, 0.4)'; // Transparent Spotify Green
+
+            // Loop through every text fragment in this sentence
+            if (currentSentence.items && currentViewport) {
+                currentSentence.items.forEach(item => {
+                    // TRANSFORM: Convert PDF Coords -> Canvas Pixels
+                    // item.transform is [scaleX, skewY, skewX, scaleY, x, y]
+                    // viewport.convertToViewportRectangle transforms [x, y, w, h]
+                    
+                    // Construct rect [x, y, w, h] from item
+                    // Note: item.height is often 0 or weird in PDF.js, we approximate using font height
+                    const tx = item.transform; 
+                    // PDF coordinates: (x, y) is bottom-left of text
+                    
+                    // We use viewport.convertToViewportRectangle to map the box
+                    // The rect input is [x_min, y_min, x_max, y_max]
+                    // We approximate width based on item.width
+                    const x = tx[4];
+                    const y = tx[5];
+                    const w = item.width;
+                    const h = item.height || 10; // Fallback height
+
+                    // Convert [minX, minY, maxX, maxY]
+                    const rect = currentViewport.convertToViewportRectangle([x, y, x + w, y + h]);
+                    
+                    // Determine x, y, width, height for canvas fillRect
+                    // rect returns [minX, minY, maxX, maxY] in viewport space
+                    const rx = Math.min(rect[0], rect[2]);
+                    const ry = Math.min(rect[1], rect[3]);
+                    const rw = Math.abs(rect[0] - rect[2]);
+                    const rh = Math.abs(rect[1] - rect[3]);
+
+                    // Draw Box
+                    // Adjust y slightly because PDF baseline differs
+                    hCtx.fillRect(rx, ry - rh, rw, rh * 1.5); 
+                });
+            }
+        }
+
+        // --- 5. LYRICS RENDERING ---
+        function renderLyrics() {
+            sentencesList.innerHTML = docData.map((item, idx) => 
+                `<div id="sent-${idx}" onclick="jumpTo(${idx})" 
+                      class="text-left px-4 py-3 rounded-lg cursor-pointer hover:bg-[#282828] transition border-l-4 border-transparent text-sm md:text-base opacity-60">
+                    ${item.text}
+                </div>`
+            ).join('');
+        }
+
+        function scrollToActive() {
+            const el = document.getElementById(`sent-${currentIndex}`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // --- 6. AUDIO ENGINE ---
+        function togglePlay() {
+            if (docData.length === 0) return;
+            if (isPlaying) {
+                synth.cancel();
+                isPlaying = false;
+                playBtnIcon.className = "fa-solid fa-play text-lg ml-1";
+            } else {
+                isPlaying = true;
+                playBtnIcon.className = "fa-solid fa-pause text-lg";
+                speak();
+            }
+        }
+
+        function speak() {
+            if (!isPlaying) return;
+            if (currentIndex >= docData.length) {
+                isPlaying = false;
+                playBtnIcon.className = "fa-solid fa-play text-lg ml-1";
+                return;
+            }
+
+            synth.cancel();
+            const item = docData[currentIndex];
+            
+            // Auto Page Turn
+            if (item.page !== currentPageNum) {
+                // Determine direction to animate/render natural flow
+                renderPage(item.page);
+            } else {
+                // Even if page didn't change, we need to redraw highlights for new sentence
+                drawHighlights();
+            }
+
+            currentUtterance = new SpeechSynthesisUtterance(item.text);
+            currentUtterance.rate = speechRate;
+            if (selectedVoice) currentUtterance.voice = selectedVoice;
+
+            currentUtterance.onend = () => {
+                if (isPlaying) {
+                    currentIndex++;
+                    updateUI();
+                    const pause = Math.floor(Math.random() * 400) + 300;
+                    setTimeout(speak, pause);
+                }
+            };
+            
+            currentUtterance.onerror = () => { if(isPlaying) { currentIndex++; speak(); }};
+
+            updateUI();
+            synth.speak(currentUtterance);
+        }
+
+        // --- 7. NAVIGATION ---
+        function skip(amount) {
+            synth.cancel();
+            currentIndex += amount;
+            if (currentIndex < 0) currentIndex = 0;
+            if (currentIndex >= docData.length) currentIndex = docData.length - 1;
+            if (isPlaying) speak(); else updateUI();
+        }
+
+        function nextSentence() { skip(1); }
+        function prevSentence() { skip(-1); }
+
+        function jumpTo(index) {
+            synth.cancel();
+            currentIndex = index;
+            isPlaying = true;
+            playBtnIcon.className = "fa-solid fa-pause text-lg";
+            speak();
+        }
+
+        function changeSpeed() {
+            const speeds = [1.0, 1.25, 1.5, 2.0];
+            const i = speeds.indexOf(speechRate);
+            speechRate = speeds[(i + 1) % speeds.length];
+            document.getElementById('speedBtn').innerText = speechRate + "x";
+            if (isPlaying) { synth.cancel(); speak(); }
+        }
+
+        function changeVoice() {
+            const voices = synth.getVoices();
+            const enVoices = voices.filter(v => v.lang.startsWith('en'));
+            if(enVoices.length > 0) {
+               const currentIdx = enVoices.indexOf(selectedVoice);
+               selectedVoice = enVoices[(currentIdx + 1) % enVoices.length];
+               alert("Voice: " + selectedVoice.name);
+               if(isPlaying) { synth.cancel(); speak(); }
+            }
+        }
+
+        function updateUI() {
+            const pct = ((currentIndex + 1) / docData.length) * 100;
+            progressBar.style.width = `${pct}%`;
+
+            const prev = document.querySelector('.active-sentence');
+            if(prev) {
+                prev.classList.remove('active-sentence', 'opacity-100');
+                prev.classList.add('opacity-60');
+            }
+
+            const curr = document.getElementById(`sent-${currentIndex}`);
+            if(curr) {
+                curr.classList.add('active-sentence', 'opacity-100');
+                curr.classList.remove('opacity-60');
+                scrollToActive();
+            }
+            
+            if (docData[currentIndex] && docData[currentIndex].page !== currentPageNum) {
+                renderPage(docData[currentIndex].page);
+            } else {
+                drawHighlights(); // Ensure highlights update if page didn't change
+            }
+        }
+    </script>
+</body>
+</html>
