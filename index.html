@@ -271,11 +271,14 @@
             color: white;
             width: 40px;
             height: 40px;
-            border-radius: 50%;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 1.2em;
+            font-size: 1em;
             z-index: 102;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #toggleUI:hover {
@@ -283,7 +286,7 @@
             transform: translateY(-50%) scale(1.1);
         }
 
-        .zoom-controls {
+        .side-controls {
             position: fixed;
             bottom: 150px;
             right: 10px;
@@ -293,21 +296,36 @@
             z-index: 101;
         }
 
-        .zoom-btn {
+        .side-btn {
             background: rgba(0, 0, 0, 0.7);
             border: none;
             color: white;
             width: 40px;
             height: 40px;
-            border-radius: 50%;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 1.2em;
+            font-size: 1em;
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
         }
 
-        .zoom-btn:hover {
+        .side-btn:hover {
             background: rgba(0, 0, 0, 0.9);
             transform: scale(1.1);
+        }
+
+        .side-btn.skip {
+            font-size: 0.75em;
+            flex-direction: column;
+            padding: 2px;
+        }
+
+        .side-btn.skip span {
+            font-size: 0.7em;
+            line-height: 1;
         }
 
         @media (max-width: 768px) {
@@ -348,12 +366,20 @@
     </div>
 
     <div id="pdfContainer">
-        <button id="toggleUI" title="Toggle UI">👁️</button>
+        <button id="toggleUI" title="Toggle UI">☰</button>
         
-        <div class="zoom-controls">
-            <button class="zoom-btn" id="zoomIn" title="Zoom In">+</button>
-            <button class="zoom-btn" id="zoomOut" title="Zoom Out">−</button>
-            <button class="zoom-btn" id="zoomReset" title="Reset Zoom">⟲</button>
+        <div class="side-controls">
+            <button class="side-btn skip" id="forward10BtnSide" title="Forward 10 sentences">
+                <div>⏭</div>
+                <span>+10</span>
+            </button>
+            <button class="side-btn skip" id="backward10BtnSide" title="Back 10 sentences">
+                <div>⏮</div>
+                <span>-10</span>
+            </button>
+            <button class="side-btn" id="zoomIn" title="Zoom In">+</button>
+            <button class="side-btn" id="zoomOut" title="Zoom Out">−</button>
+            <button class="side-btn" id="zoomReset" title="Reset Zoom">⟲</button>
         </div>
 
         <div id="pdfViewer">
@@ -372,9 +398,7 @@
             </div>
 
             <div class="control-row">
-                <button class="control-btn" id="backward10Btn" title="Back 10 sentences">⏮</button>
                 <button class="control-btn" id="playPauseBtn">▶</button>
-                <button class="control-btn" id="forward10Btn" title="Forward 10 sentences">⏭</button>
             </div>
 
             <div class="settings-row">
@@ -597,7 +621,7 @@
             }
         });
 
-        document.getElementById('forward10Btn').addEventListener('click', () => {
+        document.getElementById('forward10BtnSide').addEventListener('click', () => {
             currentSentenceIndex = Math.min(sentences.length - 1, currentSentenceIndex + 10);
             displaySentences();
             if (isPlaying) {
@@ -606,7 +630,7 @@
             }
         });
 
-        document.getElementById('backward10Btn').addEventListener('click', () => {
+        document.getElementById('backward10BtnSide').addEventListener('click', () => {
             currentSentenceIndex = Math.max(0, currentSentenceIndex - 10);
             displaySentences();
             if (isPlaying) {
