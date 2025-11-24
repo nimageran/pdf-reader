@@ -257,12 +257,21 @@
             font-size: 0.85em;
             z-index: 101;
             transition: opacity 0.3s, transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-align: center;
         }
 
         #sentenceCounter.hidden {
             opacity: 0;
             pointer-events: none;
             transform: translateY(-20px);
+        }
+
+        .page-counter {
+            font-size: 0.9em;
+            opacity: 0.8;
         }
 
         #toggleUI {
@@ -433,6 +442,8 @@
         let pageRendering = false;
         let uiVisible = true;
         let pdfScale = 1.5;
+        let sentenceToPageMap = [];
+        let pageToSentenceMap = [];
 
         // Load voices
         function loadVoices() {
@@ -528,10 +539,26 @@
 
         async function extractAllText() {
             let allText = '';
+            sentenceToPageMap = [];
+            pageToSentenceMap = new Array(pdfDoc.numPages).fill(null).map(() => []);
+            
             for (let i = 1; i <= pdfDoc.numPages; i++) {
                 const page = await pdfDoc.getPage(i);
                 const textContent = await page.getTextContent();
                 const pageText = textContent.items.map(item => item.str).join(' ');
+                
+                // Split page text into sentences
+                const pageSentences = pageText
+                    .replace(/\s+/g, ' ')
+                    .split(/(?<=[.!?])\s+/)
+                    .filter(s => s.trim().length > 0);
+                
+                // Map each sentence to its page number
+                pageSentences.forEach(sentence => {
+                    sentenceToPageMap.push(i);
+                    pageToSentenceMap[i - 1].push(sentences.length + pageToSentenceMap[i - 1].length);
+                });
+                
                 allText += pageText + ' ';
             }
             
@@ -607,6 +634,12 @@
 
             currentSentenceIndex = index;
             displaySentences();
+            
+            // Auto-change page if needed
+            const targetPage = sentenceToPageMap[index];
+            if (targetPage && targetPage !== currentPage) {
+                renderPage(targetPage);
+            }
 
             speechSynthesis.cancel();
             
