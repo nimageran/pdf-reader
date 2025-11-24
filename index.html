@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,6 +12,7 @@
             padding: 0;
             box-sizing: border-box;
         }
+<<<<<<< HEAD
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -271,6 +273,271 @@
             }
         }
     </style>
+=======
+
+```
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: #000;
+        color: #fff;
+        overflow: hidden;
+        height: 100vh;
+    }
+
+    #uploadContainer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
+
+    #uploadContainer h1 {
+        font-size: 2.5em;
+        margin-bottom: 20px;
+        text-align: center;
+        padding: 0 20px;
+    }
+
+    #uploadContainer p {
+        font-size: 1.1em;
+        margin-bottom: 30px;
+        opacity: 0.9;
+    }
+
+    #fileInput {
+        display: none;
+    }
+
+    .upload-btn {
+        padding: 15px 40px;
+        font-size: 1.1em;
+        background: #1db954;
+        color: white;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: bold;
+    }
+
+    .upload-btn:hover {
+        background: #1ed760;
+        transform: scale(1.05);
+    }
+
+    #pdfContainer {
+        display: none;
+        height: 100vh;
+        width: 100vw;
+        position: relative;
+        overflow: hidden;
+    }
+
+    #pdfViewer {
+        width: 100%;
+        height: 100%;
+        overflow-y: auto;
+        background: #2a2a2a;
+    }
+
+    #pdfCanvas {
+        display: block;
+        margin: 0 auto;
+    }
+
+    #textOverlay {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 800px;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(10px);
+        padding: 20px;
+        border-radius: 15px;
+        z-index: 100;
+        font-size: 1.2em;
+        line-height: 1.6;
+        max-height: 30vh;
+        overflow-y: auto;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .sentence {
+        display: inline;
+        transition: background-color 0.3s, color 0.3s;
+    }
+
+    .sentence.active {
+        background-color: #1db954;
+        color: #000;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+
+    #controls {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(20px);
+        padding: 20px;
+        z-index: 100;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    #progressBar {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+        margin-bottom: 20px;
+        cursor: pointer;
+        position: relative;
+    }
+
+    #progressFill {
+        height: 100%;
+        background: #1db954;
+        border-radius: 3px;
+        width: 0%;
+        transition: width 0.3s;
+    }
+
+    #progressBar:hover #progressFill {
+        background: #1ed760;
+    }
+
+    .control-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .control-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: white;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.2em;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .control-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(1.1);
+    }
+
+    #playPauseBtn {
+        width: 60px;
+        height: 60px;
+        background: #1db954;
+        font-size: 1.5em;
+    }
+
+    #playPauseBtn:hover {
+        background: #1ed760;
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    select, .speed-control {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        cursor: pointer;
+    }
+
+    select option {
+        background: #282828;
+        color: white;
+    }
+
+    .speed-control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .speed-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1em;
+    }
+
+    .speed-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    #sentenceCounter {
+        position: fixed;
+        top: 10px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.75);
+        padding: 10px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        z-index: 101;
+    }
+
+    @media (max-width: 768px) {
+        #textOverlay {
+            width: 95%;
+            font-size: 1em;
+            padding: 15px;
+        }
+
+        .control-btn {
+            width: 45px;
+            height: 45px;
+            font-size: 1em;
+        }
+
+        #playPauseBtn {
+            width: 55px;
+            height: 55px;
+        }
+
+        .settings-row {
+            gap: 10px;
+        }
+
+        select, .speed-control {
+            font-size: 0.85em;
+            padding: 6px 12px;
+        }
+    }
+</style>
+```
+
+>>>>>>> d4052b5a93c1ec1dec3a10987b115e7cdf33a23d
 </head>
 <body>
     <div id="uploadContainer">
@@ -280,6 +547,7 @@
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose PDF File</button>
     </div>
 
+<<<<<<< HEAD
     <div id="pdfContainer">
         <div id="pdfViewer">
             <canvas id="pdfCanvas"></canvas>
@@ -532,5 +800,273 @@
             }
         });
     </script>
+=======
+```
+<div id="pdfContainer">
+    <div id="pdfViewer">
+        <canvas id="pdfCanvas"></canvas>
+    </div>
+
+    <div id="sentenceCounter">
+        <span id="currentSentence">0</span> / <span id="totalSentences">0</span>
+    </div>
+
+    <div id="textOverlay"></div>
+
+    <div id="controls">
+        <div id="progressBar">
+            <div id="progressFill"></div>
+        </div>
+
+        <div class="control-row">
+            <button class="control-btn" id="backward10Btn" title="Back 10 sentences">⏮</button>
+            <button class="control-btn" id="playPauseBtn">▶</button>
+            <button class="control-btn" id="forward10Btn" title="Forward 10 sentences">⏭</button>
+        </div>
+
+        <div class="settings-row">
+            <select id="voiceSelect">
+                <option value="">Select Voice...</option>
+            </select>
+            
+            <div class="speed-control">
+                <button class="speed-btn" id="speedDown">-</button>
+                <span id="speedDisplay">1.0x</span>
+                <button class="speed-btn" id="speedUp">+</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let sentences = [];
+    let currentSentenceIndex = 0;
+    let isPlaying = false;
+    let utterance = null;
+    let playbackSpeed = 1.0;
+    let selectedVoice = null;
+    let pageRendering = false;
+
+    // Load voices
+    function loadVoices() {
+        const voices = speechSynthesis.getVoices();
+        const voiceSelect = document.getElementById('voiceSelect');
+        voiceSelect.innerHTML = '<option value="">Select Voice...</option>';
+        
+        voices.forEach((voice, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${voice.name} (${voice.lang})`;
+            voiceSelect.appendChild(option);
+        });
+
+        if (voices.length > 0 && !selectedVoice) {
+            const defaultVoice = voices.find(v => v.default) || voices[0];
+            selectedVoice = defaultVoice;
+            voiceSelect.value = voices.indexOf(defaultVoice);
+        }
+    }
+
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    document.getElementById('voiceSelect').addEventListener('change', (e) => {
+        const voices = speechSynthesis.getVoices();
+        selectedVoice = voices[e.target.value];
+    });
+
+    // File upload
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file && file.type === 'application/pdf') {
+            await loadPDF(file);
+        }
+    });
+
+    async function loadPDF(file) {
+        const fileReader = new FileReader();
+        fileReader.onload = async function() {
+            const typedArray = new Uint8Array(this.result);
+            pdfDoc = await pdfjsLib.getDocument(typedArray).promise;
+            
+            document.getElementById('uploadContainer').style.display = 'none';
+            document.getElementById('pdfContainer').style.display = 'block';
+            
+            await extractAllText();
+            renderPage(1);
+        };
+        fileReader.readAsArrayBuffer(file);
+    }
+
+    async function extractAllText() {
+        let allText = '';
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            allText += pageText + ' ';
+        }
+        
+        sentences = allText
+            .replace(/\s+/g, ' ')
+            .split(/(?<=[.!?])\s+/)
+            .filter(s => s.trim().length > 0);
+        
+        document.getElementById('totalSentences').textContent = sentences.length;
+        displaySentences();
+    }
+
+    function renderPage(num) {
+        if (pageRendering) return;
+        pageRendering = true;
+        
+        pdfDoc.getPage(num).then(page => {
+            const canvas = document.getElementById('pdfCanvas');
+            const ctx = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: 1.5 });
+            
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport
+            };
+            
+            page.render(renderContext).promise.then(() => {
+                pageRendering = false;
+                currentPage = num;
+            });
+        });
+    }
+
+    function displaySentences() {
+        const overlay = document.getElementById('textOverlay');
+        const start = Math.max(0, currentSentenceIndex - 2);
+        const end = Math.min(sentences.length, currentSentenceIndex + 8);
+        
+        let html = '';
+        for (let i = start; i < end; i++) {
+            const className = i === currentSentenceIndex ? 'sentence active' : 'sentence';
+            html += `<span class="${className}" data-index="${i}">${sentences[i]} </span>`;
+        }
+        
+        overlay.innerHTML = html;
+        document.getElementById('currentSentence').textContent = currentSentenceIndex + 1;
+        updateProgress();
+    }
+
+    function calculatePauseTime(sentence) {
+        // Count different punctuation marks
+        const periods = (sentence.match(/\./g) || []).length;
+        const commas = (sentence.match(/,/g) || []).length;
+        const exclamationQuestions = (sentence.match(/[!?]/g) || []).length;
+        
+        // Calculate total pause time (in milliseconds)
+        const pauseTime = (periods * 700) + (commas * 300) + (exclamationQuestions * 500);
+        
+        return pauseTime;
+    }
+
+    function speakSentence(index) {
+        if (index >= sentences.length) {
+            isPlaying = false;
+            document.getElementById('playPauseBtn').textContent = '▶';
+            return;
+        }
+
+        currentSentenceIndex = index;
+        displaySentences();
+
+        speechSynthesis.cancel();
+        
+        const currentSentence = sentences[index];
+        const pauseTime = calculatePauseTime(currentSentence);
+
+        utterance = new SpeechSynthesisUtterance(currentSentence);
+        utterance.rate = playbackSpeed;
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+        }
+
+        utterance.onend = () => {
+            if (isPlaying) {
+                // Add natural pause after sentence based on punctuation
+                setTimeout(() => {
+                    speakSentence(index + 1);
+                }, pauseTime);
+            }
+        };
+
+        speechSynthesis.speak(utterance);
+    }
+
+    function updateProgress() {
+        const progress = (currentSentenceIndex / sentences.length) * 100;
+        document.getElementById('progressFill').style.width = progress + '%';
+    }
+
+    // Controls
+    document.getElementById('playPauseBtn').addEventListener('click', () => {
+        if (!sentences.length) return;
+
+        isPlaying = !isPlaying;
+        document.getElementById('playPauseBtn').textContent = isPlaying ? '⏸' : '▶';
+
+        if (isPlaying) {
+            speakSentence(currentSentenceIndex);
+        } else {
+            speechSynthesis.cancel();
+        }
+    });
+
+    document.getElementById('forward10Btn').addEventListener('click', () => {
+        currentSentenceIndex = Math.min(sentences.length - 1, currentSentenceIndex + 10);
+        displaySentences();
+        if (isPlaying) {
+            speechSynthesis.cancel();
+            speakSentence(currentSentenceIndex);
+        }
+    });
+
+    document.getElementById('backward10Btn').addEventListener('click', () => {
+        currentSentenceIndex = Math.max(0, currentSentenceIndex - 10);
+        displaySentences();
+        if (isPlaying) {
+            speechSynthesis.cancel();
+            speakSentence(currentSentenceIndex);
+        }
+    });
+
+    document.getElementById('speedUp').addEventListener('click', () => {
+        playbackSpeed = Math.min(2.0, playbackSpeed + 0.25);
+        document.getElementById('speedDisplay').textContent = playbackSpeed.toFixed(2) + 'x';
+        if (utterance) utterance.rate = playbackSpeed;
+    });
+
+    document.getElementById('speedDown').addEventListener('click', () => {
+        playbackSpeed = Math.max(0.5, playbackSpeed - 0.25);
+        document.getElementById('speedDisplay').textContent = playbackSpeed.toFixed(2) + 'x';
+        if (utterance) utterance.rate = playbackSpeed;
+    });
+
+    document.getElementById('progressBar').addEventListener('click', (e) => {
+        const rect = e.target.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        currentSentenceIndex = Math.floor(percent * sentences.length);
+        displaySentences();
+        if (isPlaying) {
+            speechSynthesis.cancel();
+            speakSentence(currentSentenceIndex);
+        }
+    });
+</script>
+```
+
+>>>>>>> d4052b5a93c1ec1dec3a10987b115e7cdf33a23d
 </body>
 </html>
