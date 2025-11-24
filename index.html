@@ -263,10 +263,9 @@
 
         #toggleUI {
             position: fixed;
-            top: 50%;
+            top: 20px;
             right: 10px;
-            transform: translateY(-50%);
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.5);
             border: none;
             color: white;
             width: 40px;
@@ -282,13 +281,13 @@
         }
 
         #toggleUI:hover {
-            background: rgba(0, 0, 0, 0.9);
-            transform: translateY(-50%) scale(1.1);
+            background: rgba(0, 0, 0, 0.8);
+            transform: scale(1.1);
         }
 
         .side-controls {
             position: fixed;
-            bottom: 150px;
+            top: 70px;
             right: 10px;
             display: flex;
             flex-direction: column;
@@ -297,7 +296,7 @@
         }
 
         .side-btn {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.5);
             border: none;
             color: white;
             width: 40px;
@@ -313,7 +312,7 @@
         }
 
         .side-btn:hover {
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.8);
             transform: scale(1.1);
         }
 
@@ -529,10 +528,17 @@
             pdfDoc.getPage(num).then(page => {
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
-                const viewport = page.getViewport({ scale: pdfScale });
+                
+                // Use higher scale for rendering to maintain quality
+                const renderScale = pdfScale * 2; // Render at 2x for better quality
+                const viewport = page.getViewport({ scale: renderScale });
                 
                 canvas.height = viewport.height;
                 canvas.width = viewport.width;
+                
+                // Scale down display size using CSS for smooth appearance
+                canvas.style.width = (viewport.width / 2) + 'px';
+                canvas.style.height = (viewport.height / 2) + 'px';
                 
                 const renderContext = {
                     canvasContext: ctx,
