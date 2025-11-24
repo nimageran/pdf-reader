@@ -460,8 +460,10 @@
             });
 
             if (englishVoices.length > 0 && !selectedVoice) {
-                // Prefer US English voices, especially Samantha or natural-sounding ones
+                // Prefer Microsoft Richard, then Samantha, Alex, or natural-sounding ones
                 const preferredVoice = englishVoices.find(v => 
+                    v.name.toLowerCase().includes('richard')
+                ) || englishVoices.find(v => 
                     v.name.toLowerCase().includes('samantha') || 
                     v.name.toLowerCase().includes('alex') ||
                     v.name.toLowerCase().includes('natural')
