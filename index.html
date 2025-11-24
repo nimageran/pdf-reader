@@ -390,6 +390,8 @@
                 <div>⏮</div>
                 <span>-10</span>
             </button>
+            <button class="side-btn" id="nextPage" title="Next Page">▼</button>
+            <button class="side-btn" id="prevPage" title="Previous Page">▲</button>
             <button class="side-btn" id="zoomIn" title="Zoom In">+</button>
             <button class="side-btn" id="zoomOut" title="Zoom Out">−</button>
             <button class="side-btn" id="zoomReset" title="Reset Zoom">⟲</button>
@@ -400,7 +402,12 @@
         </div>
 
         <div id="sentenceCounter">
-            <span id="currentSentence">0</span> / <span id="totalSentences">0</span>
+            <div class="page-counter">
+                Page <span id="currentPageNum">1</span> / <span id="totalPages">0</span>
+            </div>
+            <div>
+                Sentence <span id="currentSentence">0</span> / <span id="totalSentences">0</span>
+            </div>
         </div>
 
         <div id="textOverlay"></div>
@@ -530,6 +537,7 @@
                 
                 document.getElementById('uploadContainer').style.display = 'none';
                 document.getElementById('pdfContainer').style.display = 'block';
+                document.getElementById('totalPages').textContent = pdfDoc.numPages;
                 
                 await extractAllText();
                 renderPage(1);
@@ -573,6 +581,8 @@
 
         function renderPage(num) {
             if (pageRendering) return;
+            if (num < 1 || num > pdfDoc.numPages) return;
+            
             pageRendering = true;
             
             pdfDoc.getPage(num).then(page => {
@@ -598,6 +608,7 @@
                 page.render(renderContext).promise.then(() => {
                     pageRendering = false;
                     currentPage = num;
+                    document.getElementById('currentPageNum').textContent = currentPage;
                 });
             });
         }
@@ -756,6 +767,45 @@
         document.getElementById('zoomReset').addEventListener('click', () => {
             pdfScale = 1.5;
             renderPage(currentPage);
+        });
+
+        // Page navigation buttons
+        document.getElementById('nextPage').addEventListener('click', () => {
+            if (currentPage < pdfDoc.numPages) {
+                const nextPage = currentPage + 1;
+                renderPage(nextPage);
+                
+                // Jump to first sentence of next page
+                if (pageToSentenceMap[nextPage - 1] && pageToSentenceMap[nextPage - 1].length > 0) {
+                    currentSentenceIndex = pageToSentenceMap[nextPage - 1][0];
+                    displaySentences();
+                    
+                    // If playing, start reading from this sentence
+                    if (isPlaying) {
+                        speechSynthesis.cancel();
+                        speakSentence(currentSentenceIndex);
+                    }
+                }
+            }
+        });
+
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                const prevPage = currentPage - 1;
+                renderPage(prevPage);
+                
+                // Jump to first sentence of previous page
+                if (pageToSentenceMap[prevPage - 1] && pageToSentenceMap[prevPage - 1].length > 0) {
+                    currentSentenceIndex = pageToSentenceMap[prevPage - 1][0];
+                    displaySentences();
+                    
+                    // If playing, start reading from this sentence
+                    if (isPlaying) {
+                        speechSynthesis.cancel();
+                        speakSentence(currentSentenceIndex);
+                    }
+                }
+            }
         });
     </script>
 </body>
