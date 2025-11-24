@@ -451,8 +451,18 @@
                 // Exclude British English
                 if (lang.includes('gb') || name.includes('british') || name.includes('daniel') || name.includes('karen')) return false;
                 
-                // Exclude robotic/poor quality voices
-                if (name.includes('compact') || name.includes('monotone') || name.includes('bells') || name.includes('bad news')) return false;
+                // Exclude robotic/poor quality voices (common across platforms)
+                if (name.includes('compact') || name.includes('monotone') || name.includes('bells') || 
+                    name.includes('bad news') || name.includes('good news') || name.includes('bubbles') || 
+                    name.includes('cellos') || name.includes('zarvox') || name.includes('trinoids') ||
+                    name.includes('whisper') || name.includes('junior') || name.includes('ralph') ||
+                    name.includes('fred') || name.includes('bahh') || name.includes('albert')) return false;
+                
+                // On iOS/Mac, filter out novelty and low-quality voices
+                if (name.includes('premium') === false && (
+                    name.includes('organ') || name.includes('rocko') || name.includes('shelley') ||
+                    name.includes('superstar') || name.includes('reed') || name.includes('sandy')
+                )) return false;
                 
                 return true;
             });
@@ -465,13 +475,19 @@
             });
 
             if (englishVoices.length > 0 && !selectedVoice) {
-                // Prefer Microsoft Richard, then Samantha, Alex, or natural-sounding ones
+                // Prefer Microsoft Richard on Windows, then high-quality voices on other platforms
                 const preferredVoice = englishVoices.find(v => 
                     v.name.toLowerCase().includes('richard')
                 ) || englishVoices.find(v => 
+                    // Prefer premium/enhanced voices on iOS
+                    v.name.toLowerCase().includes('premium') ||
+                    v.name.toLowerCase().includes('enhanced') ||
                     v.name.toLowerCase().includes('samantha') || 
                     v.name.toLowerCase().includes('alex') ||
-                    v.name.toLowerCase().includes('natural')
+                    v.name.toLowerCase().includes('natural') ||
+                    v.name.toLowerCase().includes('aaron') ||
+                    v.name.toLowerCase().includes('nicky') ||
+                    v.name.toLowerCase().includes('siri')
                 ) || englishVoices[0];
                 
                 selectedVoice = preferredVoice;
