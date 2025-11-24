@@ -412,17 +412,40 @@
             const voiceSelect = document.getElementById('voiceSelect');
             voiceSelect.innerHTML = '<option value="">Select Voice...</option>';
             
-            voices.forEach((voice, index) => {
+            // Filter for English voices only, excluding British and robotic ones
+            const englishVoices = voices.filter(voice => {
+                const lang = voice.lang.toLowerCase();
+                const name = voice.name.toLowerCase();
+                
+                // Only include English voices
+                if (!lang.startsWith('en')) return false;
+                
+                // Exclude British English
+                if (lang.includes('gb') || name.includes('british') || name.includes('daniel') || name.includes('karen')) return false;
+                
+                // Exclude robotic/poor quality voices
+                if (name.includes('compact') || name.includes('monotone') || name.includes('bells') || name.includes('bad news')) return false;
+                
+                return true;
+            });
+            
+            englishVoices.forEach((voice, index) => {
                 const option = document.createElement('option');
-                option.value = index;
+                option.value = voices.indexOf(voice);
                 option.textContent = `${voice.name} (${voice.lang})`;
                 voiceSelect.appendChild(option);
             });
 
-            if (voices.length > 0 && !selectedVoice) {
-                const defaultVoice = voices.find(v => v.default) || voices[0];
-                selectedVoice = defaultVoice;
-                voiceSelect.value = voices.indexOf(defaultVoice);
+            if (englishVoices.length > 0 && !selectedVoice) {
+                // Prefer US English voices, especially Samantha or natural-sounding ones
+                const preferredVoice = englishVoices.find(v => 
+                    v.name.toLowerCase().includes('samantha') || 
+                    v.name.toLowerCase().includes('alex') ||
+                    v.name.toLowerCase().includes('natural')
+                ) || englishVoices[0];
+                
+                selectedVoice = preferredVoice;
+                voiceSelect.value = voices.indexOf(preferredVoice);
             }
         }
 
