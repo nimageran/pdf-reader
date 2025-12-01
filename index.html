@@ -24,18 +24,6 @@
             height: 100vh;
         }
 
-        /* Hide the wake lock video visually but keep it in the DOM */
-        #wakeLockVideo {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0.01;
-            pointer-events: none;
-            z-index: -1;
-        }
-
         #uploadContainer {
             display: flex;
             flex-direction: column;
@@ -383,11 +371,6 @@
     </style>
 </head>
 <body>
-    <!-- This invisible video loops to keep the iOS processor awake -->
-    <video id="wakeLockVideo" playsinline loop muted>
-        <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tAAAAAAAzbW9vdgAAAABsbXZoAAAAANE8n8AAAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAODXRyYWsAAABcdGtoZAAAAAEdAAAPAAAAAAABAAAAAAEAAAAAAAAAAAAAAABAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAMW1kaWEAAAAgbWRoZAAAAADRPJ/AAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABUWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAAB2aWRlb2hhbmRsZXIAAAABZ21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAA5zdGJsAAAAEmN0dHMAAAAAAQAAAAEAAAABAAAAFHN0c3MAAAAAAQAAAAEAAAABAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAABAAAAAQAAABhNZGF0AAAAAAAA" type="video/mp4">
-    </video>
-
     <div id="uploadContainer">
         <h1>📖 PDF Audiobook Player</h1>
         <p>Upload your PDF and enjoy listening with style</p>
@@ -400,11 +383,11 @@
         
         <div class="side-controls">
             <button class="side-btn skip" id="forward10BtnSide" title="Forward 10 sentences">
-                <div>⏭</div>
+                <div>⤴</div>
                 <span>+10</span>
             </button>
             <button class="side-btn skip" id="backward10BtnSide" title="Back 10 sentences">
-                <div>⏮</div>
+                <div>⤵</div>
                 <span>-10</span>
             </button>
             <button class="side-btn" id="nextPage" title="Next Page">▼</button>
@@ -453,6 +436,46 @@
     </div>
 
     <script>
+        // ============ BACKGROUND PLAYBACK SETUP ============
+        // Request persistent screen wake lock if available
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log('Wake lock failed:', err);
+                }
+            }
+        }
+
+        // Set audio context to allow background playback
+        if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // iOS specific: Allow audio to play in background
+        document.addEventListener('play', function() {
+            requestWakeLock();
+        }, true);
+
+        // Prevent auto-lock while playing
+        document.addEventListener('DOMContentLoaded', () => {
+            requestWakeLock();
+        });
+
+        // Keep wake lock active while playing
+        function keepWakeLockActive() {
+            if ('wakeLock' in navigator) {
+                requestWakeLock().catch(() => {
+                    // Silently fail if wake lock not available
+                });
+            }
+        }
+        // ============ END BACKGROUND PLAYBACK SETUP ============
+
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let pdfDoc = null;
@@ -468,11 +491,6 @@
         let pdfScale = 1.5;
         let sentenceToPageMap = [];
         let pageToSentenceMap = [];
-        
-        // --- BACKGROUND AUDIO HACK VARIABLES ---
-        let wakeLockVideo = document.getElementById('wakeLockVideo');
-        let backgroundEnabled = false;
-        let heartbeatInterval = null;
 
         // Load voices
         function loadVoices() {
@@ -665,6 +683,9 @@
                 return;
             }
 
+            // Request wake lock before speaking
+            keepWakeLockActive();
+
             currentSentenceIndex = index;
             displaySentences();
             
@@ -687,6 +708,9 @@
 
             utterance.onend = () => {
                 if (isPlaying) {
+                    // Request wake lock again before next sentence
+                    keepWakeLockActive();
+                    
                     // Add natural pause after sentence based on punctuation
                     setTimeout(() => {
                         speakSentence(index + 1);
@@ -702,98 +726,38 @@
             document.getElementById('progressFill').style.width = progress + '%';
         }
 
-        // --- 1. ENABLE BACKGROUND AUDIO ---
-        function enableBackgroundMode() {
-            if (backgroundEnabled) return;
-            
-            // Start the silent video loop. 
-            // iOS requires a user interaction (click) to start this, which happens when you click 'Play'.
-            wakeLockVideo.play().then(() => {
-                console.log("Wake Lock Video Active");
-            }).catch(e => console.log("Wake Lock failed:", e));
+        // Controls
+        document.getElementById('playPauseBtn').addEventListener('click', () => {
+            if (!sentences.length) return;
 
-            // Set up Media Session API (The Lock Screen Controls)
-            if ('mediaSession' in navigator) {
-                navigator.mediaSession.setActionHandler('play', () => {
-                    togglePlay(true);
-                });
-                navigator.mediaSession.setActionHandler('pause', () => {
-                    togglePlay(false);
-                });
-                navigator.mediaSession.setActionHandler('previoustrack', () => {
-                    navigateSentence(-10);
-                });
-                navigator.mediaSession.setActionHandler('nexttrack', () => {
-                    navigateSentence(10);
-                });
+            isPlaying = !isPlaying;
+            document.getElementById('playPauseBtn').textContent = isPlaying ? '⸸' : '▶';
+
+            if (isPlaying) {
+                // Request wake lock when starting playback
+                keepWakeLockActive();
+                speakSentence(currentSentenceIndex);
+            } else {
+                speechSynthesis.cancel();
             }
-            backgroundEnabled = true;
-        }
+        });
 
-        // Keep the JS thread alive on iOS
-        function startHeartbeat() {
-            if (heartbeatInterval) clearInterval(heartbeatInterval);
-            heartbeatInterval = setInterval(() => {
-                // If the system paused us unexpectedly (common iOS bug), force resume
-                if (speechSynthesis.paused && isPlaying) {
-                    speechSynthesis.resume();
-                }
-                console.log("Heartbeat active"); 
-            }, 3000);
-        }
-
-        function stopHeartbeat() {
-            if (heartbeatInterval) clearInterval(heartbeatInterval);
-        }
-
-        // Helper function for navigating
-        function navigateSentence(delta) {
-            const newIndex = currentSentenceIndex + delta;
-            
-            // Bound checking
-            if (newIndex < 0) currentSentenceIndex = 0;
-            else if (newIndex >= sentences.length) currentSentenceIndex = sentences.length - 1;
-            else currentSentenceIndex = newIndex;
-
+        document.getElementById('forward10BtnSide').addEventListener('click', () => {
+            currentSentenceIndex = Math.min(sentences.length - 1, currentSentenceIndex + 10);
             displaySentences();
             if (isPlaying) {
                 speechSynthesis.cancel();
                 speakSentence(currentSentenceIndex);
             }
-        }
-
-        // Controls
-        function togglePlay(forceState) {
-            if (sentences.length === 0) return;
-            
-            // Activate the background hacks on first play
-            enableBackgroundMode();
-
-            const newState = forceState !== undefined ? forceState : !isPlaying;
-            isPlaying = newState;
-            
-            const btn = document.getElementById('playPauseBtn');
-            btn.textContent = isPlaying ? '⏸' : '▶';
-
-            if (isPlaying) {
-                startHeartbeat(); // Start the keep-alive timer
-                speakSentence(currentSentenceIndex);
-                if (navigator.mediaSession) navigator.mediaSession.playbackState = "playing";
-            } else {
-                stopHeartbeat(); // Stop the keep-alive timer
-                speechSynthesis.cancel();
-                if (navigator.mediaSession) navigator.mediaSession.playbackState = "paused";
-            }
-        }
-
-        document.getElementById('playPauseBtn').addEventListener('click', () => togglePlay());
-
-        document.getElementById('forward10BtnSide').addEventListener('click', () => {
-            navigateSentence(10);
         });
 
         document.getElementById('backward10BtnSide').addEventListener('click', () => {
-            navigateSentence(-10);
+            currentSentenceIndex = Math.max(0, currentSentenceIndex - 10);
+            displaySentences();
+            if (isPlaying) {
+                speechSynthesis.cancel();
+                speakSentence(currentSentenceIndex);
+            }
         });
 
         document.getElementById('speedUp').addEventListener('click', () => {
