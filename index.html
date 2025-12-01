@@ -1,11 +1,471 @@
-<!-- ... existing code ... -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PDF Reader">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231db954' width='100' height='100' rx='20'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>📖</text></svg>">
+    <title>PDF Audiobook Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Hide the wake lock video visually but keep it in the DOM */
+        #wakeLockVideo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0.01;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        #uploadContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        }
+
+        #uploadContainer h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        #uploadContainer p {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-btn {
+            padding: 15px 40px;
+            font-size: 1.1em;
+            background: #1db954;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .upload-btn:hover {
+            background: #1ed760;
+            transform: scale(1.05);
+        }
+
+        #pdfContainer {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #pdfViewer {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            background: #2a2a2a;
+        }
+
+        #pdfCanvas {
+            display: block;
+            margin: 0 auto;
+        }
+
+        #textOverlay {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(3px);
+            padding: 10px 15px;
+            border-radius: 10px;
+            z-index: 100;
+            font-size: 1em;
+            line-height: 1.4;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        #textOverlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-50%) translateY(-20px);
+        }
+
+        .sentence {
+            display: inline;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .sentence.active {
+            background-color: #1db954;
+            color: #000;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        #controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 12px 15px;
+            z-index: 100;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        #controls.hidden {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+
+        #progressBar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        #progressFill {
+            height: 100%;
+            background: #1db954;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        #progressBar:hover #progressFill {
+            background: #1ed760;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        #playPauseBtn {
+            width: 50px;
+            height: 50px;
+            background: #1db954;
+            font-size: 1.3em;
+        }
+
+        #playPauseBtn:hover {
+            background: #1ed760;
+        }
+
+        .settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        select, .speed-control {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+
+        select option {
+            background: #282828;
+            color: white;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .speed-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .speed-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #sentenceCounter {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            z-index: 101;
+            transition: opacity 0.3s, transform 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            text-align: center;
+        }
+
+        #sentenceCounter.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-20px);
+        }
+
+        .page-counter {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        #toggleUI {
+            position: fixed;
+            top: 20px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            z-index: 102;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #toggleUI:hover {
+            background: rgba(0, 0, 0, 0.8);
+            transform: scale(1.1);
+        }
+
+        .side-controls {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 101;
+        }
+
+        .side-btn {
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .side-btn:hover {
+            background: rgba(0, 0, 0, 0.8);
+            transform: scale(1.1);
+        }
+
+        .side-btn.skip {
+            font-size: 0.75em;
+            flex-direction: column;
+            padding: 2px;
+        }
+
+        .side-btn.skip span {
+            font-size: 0.7em;
+            line-height: 1;
+        }
+
+        @media (max-width: 768px) {
+            #textOverlay {
+                width: 95%;
+                font-size: 1em;
+                padding: 15px;
+            }
+
+            .control-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 1em;
+            }
+
+            #playPauseBtn {
+                width: 55px;
+                height: 55px;
+            }
+
+            .settings-row {
+                gap: 10px;
+            }
+
+            select, .speed-control {
+                font-size: 0.85em;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
     <!-- This invisible video loops to keep the iOS processor awake -->
     <video id="wakeLockVideo" playsinline loop muted>
         <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tAAAAAAAzbW9vdgAAAABsbXZoAAAAANE8n8AAAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAODXRyYWsAAABcdGtoZAAAAAEdAAAPAAAAAAABAAAAAAEAAAAAAAAAAAAAAABAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAMW1kaWEAAAAgbWRoZAAAAADRPJ/AAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAABUWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAAB2aWRlb2hhbmRsZXIAAAABZ21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAA5zdGJsAAAAEmN0dHMAAAAAAQAAAAEAAAABAAAAFHN0c3MAAAAAAQAAAAEAAAABAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAABAAAAAQAAABhNZGF0AAAAAAAA" type="video/mp4">
     </video>
 
     <div id="uploadContainer">
-<!-- ... existing code ... -->
+        <h1>📖 PDF Audiobook Player</h1>
+        <p>Upload your PDF and enjoy listening with style</p>
+        <input type="file" id="fileInput" accept=".pdf">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose PDF File</button>
+    </div>
+
+    <div id="pdfContainer">
+        <button id="toggleUI" title="Toggle UI">☰</button>
+        
+        <div class="side-controls">
+            <button class="side-btn skip" id="forward10BtnSide" title="Forward 10 sentences">
+                <div>⏭</div>
+                <span>+10</span>
+            </button>
+            <button class="side-btn skip" id="backward10BtnSide" title="Back 10 sentences">
+                <div>⏮</div>
+                <span>-10</span>
+            </button>
+            <button class="side-btn" id="nextPage" title="Next Page">▼</button>
+            <button class="side-btn" id="prevPage" title="Previous Page">▲</button>
+            <button class="side-btn" id="zoomIn" title="Zoom In">+</button>
+            <button class="side-btn" id="zoomOut" title="Zoom Out">−</button>
+            <button class="side-btn" id="zoomReset" title="Reset Zoom">⟲</button>
+        </div>
+
+        <div id="pdfViewer">
+            <canvas id="pdfCanvas"></canvas>
+        </div>
+
+        <div id="sentenceCounter">
+            <div class="page-counter">
+                Page <span id="currentPageNum">1</span> / <span id="totalPages">0</span>
+            </div>
+            <div>
+                Sentence <span id="currentSentence">0</span> / <span id="totalSentences">0</span>
+            </div>
+        </div>
+
+        <div id="textOverlay"></div>
+
+        <div id="controls">
+            <div id="progressBar">
+                <div id="progressFill"></div>
+            </div>
+
+            <div class="control-row">
+                <button class="control-btn" id="playPauseBtn">▶</button>
+            </div>
+
+            <div class="settings-row">
+                <select id="voiceSelect">
+                    <option value="">Select Voice...</option>
+                </select>
+                
+                <div class="speed-control">
+                    <button class="speed-btn" id="speedDown">-</button>
+                    <span id="speedDisplay">1.0x</span>
+                    <button class="speed-btn" id="speedUp">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pdfDoc = null;
+        let currentPage = 1;
+        let sentences = [];
+        let currentSentenceIndex = 0;
+        let isPlaying = false;
+        let utterance = null;
+        let playbackSpeed = 1.0;
+        let selectedVoice = null;
+        let pageRendering = false;
+        let uiVisible = true;
+        let pdfScale = 1.5;
         let sentenceToPageMap = [];
         let pageToSentenceMap = [];
         
@@ -13,6 +473,234 @@
         let wakeLockVideo = document.getElementById('wakeLockVideo');
         let backgroundEnabled = false;
         let heartbeatInterval = null;
+
+        // Load voices
+        function loadVoices() {
+            const voices = speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById('voiceSelect');
+            voiceSelect.innerHTML = '<option value="">Select Voice...</option>';
+            
+            // Filter for English voices only, excluding British and robotic ones
+            const englishVoices = voices.filter(voice => {
+                const lang = voice.lang.toLowerCase();
+                const name = voice.name.toLowerCase();
+                
+                // Only include English voices
+                if (!lang.startsWith('en')) return false;
+                
+                // Exclude British English
+                if (lang.includes('gb') || name.includes('british') || name.includes('daniel') || name.includes('karen')) return false;
+                
+                // Exclude robotic/poor quality voices (common across platforms)
+                if (name.includes('compact') || name.includes('monotone') || name.includes('bells') || 
+                    name.includes('bad news') || name.includes('good news') || name.includes('bubbles') || 
+                    name.includes('cellos') || name.includes('zarvox') || name.includes('trinoids') ||
+                    name.includes('whisper') || name.includes('junior') || name.includes('ralph') ||
+                    name.includes('fred') || name.includes('bahh') || name.includes('albert')) return false;
+                
+                // On iOS/Mac, filter out novelty and low-quality voices
+                if (name.includes('premium') === false && (
+                    name.includes('organ') || name.includes('rocko') || name.includes('shelley') ||
+                    name.includes('superstar') || name.includes('reed') || name.includes('sandy')
+                )) return false;
+                
+                return true;
+            });
+            
+            englishVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = voices.indexOf(voice);
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+
+            if (englishVoices.length > 0 && !selectedVoice) {
+                // Prefer Microsoft Richard on Windows, then high-quality voices on other platforms
+                const preferredVoice = englishVoices.find(v => 
+                    v.name.toLowerCase().includes('richard')
+                ) || englishVoices.find(v => 
+                    // Prefer premium/enhanced voices on iOS
+                    v.name.toLowerCase().includes('premium') ||
+                    v.name.toLowerCase().includes('enhanced') ||
+                    v.name.toLowerCase().includes('samantha') || 
+                    v.name.toLowerCase().includes('alex') ||
+                    v.name.toLowerCase().includes('natural') ||
+                    v.name.toLowerCase().includes('aaron') ||
+                    v.name.toLowerCase().includes('nicky') ||
+                    v.name.toLowerCase().includes('siri')
+                ) || englishVoices[0];
+                
+                selectedVoice = preferredVoice;
+                voiceSelect.value = voices.indexOf(preferredVoice);
+            }
+        }
+
+        speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
+
+        document.getElementById('voiceSelect').addEventListener('change', (e) => {
+            const voices = speechSynthesis.getVoices();
+            selectedVoice = voices[e.target.value];
+        });
+
+        // File upload
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                await loadPDF(file);
+            }
+        });
+
+        async function loadPDF(file) {
+            const fileReader = new FileReader();
+            fileReader.onload = async function() {
+                const typedArray = new Uint8Array(this.result);
+                pdfDoc = await pdfjsLib.getDocument(typedArray).promise;
+                
+                document.getElementById('uploadContainer').style.display = 'none';
+                document.getElementById('pdfContainer').style.display = 'block';
+                document.getElementById('totalPages').textContent = pdfDoc.numPages;
+                
+                await extractAllText();
+                renderPage(1);
+            };
+            fileReader.readAsArrayBuffer(file);
+        }
+
+        async function extractAllText() {
+            let allText = '';
+            sentenceToPageMap = [];
+            pageToSentenceMap = new Array(pdfDoc.numPages).fill(null).map(() => []);
+            
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                
+                // Split page text into sentences
+                const pageSentences = pageText
+                    .replace(/\s+/g, ' ')
+                    .split(/(?<=[.!?])\s+/)
+                    .filter(s => s.trim().length > 0);
+                
+                // Map each sentence to its page number
+                pageSentences.forEach(sentence => {
+                    sentenceToPageMap.push(i);
+                    pageToSentenceMap[i - 1].push(sentences.length + pageToSentenceMap[i - 1].length);
+                });
+                
+                allText += pageText + ' ';
+            }
+            
+            sentences = allText
+                .replace(/\s+/g, ' ')
+                .split(/(?<=[.!?])\s+/)
+                .filter(s => s.trim().length > 0);
+            
+            document.getElementById('totalSentences').textContent = sentences.length;
+            displaySentences();
+        }
+
+        function renderPage(num) {
+            if (pageRendering) return;
+            if (num < 1 || num > pdfDoc.numPages) return;
+            
+            pageRendering = true;
+            
+            pdfDoc.getPage(num).then(page => {
+                const canvas = document.getElementById('pdfCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Use higher scale for rendering to maintain quality
+                const renderScale = pdfScale * 2; // Render at 2x for better quality
+                const viewport = page.getViewport({ scale: renderScale });
+                
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                // Scale down display size using CSS for smooth appearance
+                canvas.style.width = (viewport.width / 2) + 'px';
+                canvas.style.height = (viewport.height / 2) + 'px';
+                
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                
+                page.render(renderContext).promise.then(() => {
+                    pageRendering = false;
+                    currentPage = num;
+                    document.getElementById('currentPageNum').textContent = currentPage;
+                });
+            });
+        }
+
+        function displaySentences() {
+            const overlay = document.getElementById('textOverlay');
+            
+            // Show only the current sentence
+            const currentSentence = sentences[currentSentenceIndex];
+            overlay.innerHTML = `<span class="sentence active">${currentSentence}</span>`;
+            
+            document.getElementById('currentSentence').textContent = currentSentenceIndex + 1;
+            updateProgress();
+        }
+
+        function calculatePauseTime(sentence) {
+            // Count different punctuation marks
+            const periods = (sentence.match(/\./g) || []).length;
+            const commas = (sentence.match(/,/g) || []).length;
+            const exclamationQuestions = (sentence.match(/[!?]/g) || []).length;
+            
+            // Calculate total pause time (in milliseconds)
+            const pauseTime = (periods * 700) + (commas * 300) + (exclamationQuestions * 500);
+            
+            return pauseTime;
+        }
+
+        function speakSentence(index) {
+            if (index >= sentences.length) {
+                isPlaying = false;
+                document.getElementById('playPauseBtn').textContent = '▶';
+                return;
+            }
+
+            currentSentenceIndex = index;
+            displaySentences();
+            
+            // Auto-change page if needed
+            const targetPage = sentenceToPageMap[index];
+            if (targetPage && targetPage !== currentPage) {
+                renderPage(targetPage);
+            }
+
+            speechSynthesis.cancel();
+            
+            const currentSentence = sentences[index];
+            const pauseTime = calculatePauseTime(currentSentence);
+
+            utterance = new SpeechSynthesisUtterance(currentSentence);
+            utterance.rate = playbackSpeed;
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+
+            utterance.onend = () => {
+                if (isPlaying) {
+                    // Add natural pause after sentence based on punctuation
+                    setTimeout(() => {
+                        speakSentence(index + 1);
+                    }, pauseTime);
+                }
+            };
+
+            speechSynthesis.speak(utterance);
+        }
+
+        function updateProgress() {
+            const progress = (currentSentenceIndex / sentences.length) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
 
         // --- 1. ENABLE BACKGROUND AUDIO ---
         function enableBackgroundMode() {
@@ -58,8 +746,23 @@
             if (heartbeatInterval) clearInterval(heartbeatInterval);
         }
 
-        function updateMediaSessionMetadata() {
-<!-- ... existing code ... -->
+        // Helper function for navigating
+        function navigateSentence(delta) {
+            const newIndex = currentSentenceIndex + delta;
+            
+            // Bound checking
+            if (newIndex < 0) currentSentenceIndex = 0;
+            else if (newIndex >= sentences.length) currentSentenceIndex = sentences.length - 1;
+            else currentSentenceIndex = newIndex;
+
+            displaySentences();
+            if (isPlaying) {
+                speechSynthesis.cancel();
+                speakSentence(currentSentenceIndex);
+            }
+        }
+
+        // Controls
         function togglePlay(forceState) {
             if (sentences.length === 0) return;
             
@@ -83,5 +786,111 @@
             }
         }
 
-        function navigateSentence(delta) {
-<!-- ... existing code ... -->
+        document.getElementById('playPauseBtn').addEventListener('click', () => togglePlay());
+
+        document.getElementById('forward10BtnSide').addEventListener('click', () => {
+            navigateSentence(10);
+        });
+
+        document.getElementById('backward10BtnSide').addEventListener('click', () => {
+            navigateSentence(-10);
+        });
+
+        document.getElementById('speedUp').addEventListener('click', () => {
+            playbackSpeed = Math.min(2.0, playbackSpeed + 0.25);
+            document.getElementById('speedDisplay').textContent = playbackSpeed.toFixed(2) + 'x';
+            if (utterance) utterance.rate = playbackSpeed;
+        });
+
+        document.getElementById('speedDown').addEventListener('click', () => {
+            playbackSpeed = Math.max(0.5, playbackSpeed - 0.25);
+            document.getElementById('speedDisplay').textContent = playbackSpeed.toFixed(2) + 'x';
+            if (utterance) utterance.rate = playbackSpeed;
+        });
+
+        document.getElementById('progressBar').addEventListener('click', (e) => {
+            const rect = e.target.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            currentSentenceIndex = Math.floor(percent * sentences.length);
+            displaySentences();
+            if (isPlaying) {
+                speechSynthesis.cancel();
+                speakSentence(currentSentenceIndex);
+            }
+        });
+
+        // Toggle UI visibility
+        document.getElementById('toggleUI').addEventListener('click', () => {
+            uiVisible = !uiVisible;
+            const controls = document.getElementById('controls');
+            const textOverlay = document.getElementById('textOverlay');
+            const counter = document.getElementById('sentenceCounter');
+            
+            if (uiVisible) {
+                controls.classList.remove('hidden');
+                textOverlay.classList.remove('hidden');
+                counter.classList.remove('hidden');
+            } else {
+                controls.classList.add('hidden');
+                textOverlay.classList.add('hidden');
+                counter.classList.add('hidden');
+            }
+        });
+
+        // Zoom controls
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            pdfScale = Math.min(3.0, pdfScale + 0.25);
+            renderPage(currentPage);
+        });
+
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            pdfScale = Math.max(0.5, pdfScale - 0.25);
+            renderPage(currentPage);
+        });
+
+        document.getElementById('zoomReset').addEventListener('click', () => {
+            pdfScale = 1.5;
+            renderPage(currentPage);
+        });
+
+        // Page navigation buttons
+        document.getElementById('nextPage').addEventListener('click', () => {
+            if (currentPage < pdfDoc.numPages) {
+                const nextPage = currentPage + 1;
+                renderPage(nextPage);
+                
+                // Jump to first sentence of next page
+                if (pageToSentenceMap[nextPage - 1] && pageToSentenceMap[nextPage - 1].length > 0) {
+                    currentSentenceIndex = pageToSentenceMap[nextPage - 1][0];
+                    displaySentences();
+                    
+                    // If playing, start reading from this sentence
+                    if (isPlaying) {
+                        speechSynthesis.cancel();
+                        speakSentence(currentSentenceIndex);
+                    }
+                }
+            }
+        });
+
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                const prevPage = currentPage - 1;
+                renderPage(prevPage);
+                
+                // Jump to first sentence of previous page
+                if (pageToSentenceMap[prevPage - 1] && pageToSentenceMap[prevPage - 1].length > 0) {
+                    currentSentenceIndex = pageToSentenceMap[prevPage - 1][0];
+                    displaySentences();
+                    
+                    // If playing, start reading from this sentence
+                    if (isPlaying) {
+                        speechSynthesis.cancel();
+                        speakSentence(currentSentenceIndex);
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
